@@ -1,1023 +1,2281 @@
-import { useState, useEffect, useCallback } from 'react';
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>$cannerGol</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── DARK ── */
+:root {
+  --bg:#0D0F14; --surface:#131720; --surface2:#1A1F2E; --border:#232840;
+  --text:#E8EAF0; --muted:#6B7599; --dim:#8892AA;
+  --green:#00C853; --green-dim:rgba(0,200,83,0.1); --green-b:rgba(0,200,83,0.28);
+  --yellow:#FFD600; --yellow-dim:rgba(255,214,0,0.1); --yellow-b:rgba(255,214,0,0.28);
+  --red:#F23557; --red-dim:rgba(242,53,87,0.1); --red-b:rgba(242,53,87,0.28);
+  --orange:#FF6B35; --orange-dim:rgba(255,107,53,0.1); --orange-b:rgba(255,107,53,0.3);
+  --accent:#4A6FFF; --accent-dim:rgba(74,111,255,0.1); --accent-b:rgba(74,111,255,0.28);
+  --fd:'Syne',sans-serif; --fm:'JetBrains Mono',monospace; --fb:'Rajdhani',sans-serif;
+  --r:12px;
+}
+/* ── LIGHT (fix #12: contraste mínimo 4.5:1) ── */
+html.light {
+  --bg:#F0F2F8; --surface:#FFFFFF; --surface2:#ECEEF5; --border:#CDD2E4;
+  --text:#111827; --muted:#4A5272; --dim:#5A6280;
+  --green:#007A30; --green-dim:rgba(0,122,48,0.08); --green-b:rgba(0,122,48,0.28);
+  --yellow:#907000; --yellow-dim:rgba(144,112,0,0.08); --yellow-b:rgba(144,112,0,0.28);
+  --red:#B8001F; --red-dim:rgba(184,0,31,0.07); --red-b:rgba(184,0,31,0.25);
+  --orange:#A03800; --orange-dim:rgba(160,56,0,0.07); --orange-b:rgba(160,56,0,0.25);
+  --accent:#2B4FCC; --accent-dim:rgba(43,79,204,0.07); --accent-b:rgba(43,79,204,0.28);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;overflow-x:hidden;transition:background .25s,color .25s;}
 
-const ADMIN_PIN = '1234';
+/* ── HEADER ── */
+.header{display:flex;align-items:center;justify-content:space-between;padding:13px 22px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:50;}
+.logo-name{font-family:var(--fd);font-weight:800;font-size:20px;letter-spacing:-0.5px;}
+.logo-name span{color:var(--accent);}
+.logo-sub{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1px;margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:7px;}
+.btn-zero{display:flex;align-items:center;gap:6px;background:var(--orange-dim);border:1px solid var(--orange-b);border-radius:20px;padding:6px 12px;cursor:pointer;font-family:var(--fm);font-size:10px;color:var(--orange);transition:all .2s;}
+.btn-zero:hover{filter:brightness(1.1);}
+.zero-badge{background:var(--orange);color:#fff;border-radius:50%;width:17px;height:17px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;}
+.btn-icon{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;color:var(--dim);}
+.btn-icon:hover{border-color:var(--accent);color:var(--accent);}
 
-const STORAGE_KEY = 'bolao-data';
+/* ── SETTINGS ── */
+.settings-wrap{position:relative;}
+.settings-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:8px;min-width:178px;box-shadow:0 8px 28px rgba(0,0,0,.3);z-index:200;}
+.settings-menu.open{display:block;}
+.settings-sec-divider{height:1px;background:var(--border);margin:8px 0;}
+.settings-action{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;font-family:var(--fb);font-size:13px;font-weight:600;color:var(--text);transition:background .15s;white-space:nowrap;}
+.settings-action:hover{background:var(--surface2);}
+.settings-action.danger{color:var(--red);}
+.settings-action.danger:hover{background:var(--red-dim);}
+#importFileInput{display:none;}
+.discard-modal-text{font-family:var(--fb);font-size:14px;color:var(--text);line-height:1.6;}
+.settings-sec-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;padding:4px 8px 8px;}
+.theme-opt{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s;font-family:var(--fb);font-weight:600;font-size:13px;color:var(--dim);}
+.theme-opt:hover{background:var(--surface2);}
+.theme-opt.active{background:var(--accent-dim);color:var(--accent);}
 
-const STATUS = {
-  futuro: { label: 'Futuro', icon: '🔵', border: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
-  aguardando: { label: 'Aguardando Apuração', icon: '🟡', border: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
-  finalizado: { label: 'Finalizado', icon: '🟢', border: '#22c55e', bg: 'rgba(34,197,94,0.08)' }
+/* ── PROGRESS BAR (#8) ── */
+.progress-bar-wrap{height:3px;background:var(--border);position:sticky;top:60px;z-index:49;}
+.progress-bar-fill{height:100%;background:var(--accent);transition:width .4s ease;width:0%;}
+
+/* ── NAV ── */
+.nav-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 22px;gap:2px;}
+.nav-tab{padding:11px 14px;border:none;background:transparent;color:var(--muted);font-family:var(--fb);font-weight:600;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.nav-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.tab-pill{background:var(--accent-dim);color:var(--accent);border-radius:20px;padding:1px 7px;font-family:var(--fm);font-size:9px;}
+.nav-tab.active .tab-pill{background:var(--accent);color:#fff;}
+
+/* ── LAYOUT ── */
+.main{max-width:860px;margin:0 auto;padding:22px 16px 100px;}
+.page{display:none;}.page.active{display:block;}
+.sec-label{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;}
+
+/* ── MARKET CARDS ── */
+.m-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:9px;overflow:hidden;transition:border-color .2s,opacity .2s;}
+.m-card.disabled{opacity:.4;}
+.m-card-header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;user-select:none;}
+.m-card-header.clickable{cursor:pointer;}
+.m-card-left{display:flex;align-items:center;gap:11px;}
+.m-card-num{font-family:var(--fm);font-size:10px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-b);border-radius:6px;padding:3px 7px;min-width:32px;text-align:center;}
+.m-card-title{font-family:var(--fd);font-weight:700;font-size:14px;}
+.m-card-sub{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:1px;}
+.m-card-right{display:flex;align-items:center;gap:9px;}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:background .3s;flex-shrink:0;}
+.status-dot.filled{background:var(--green);}
+/* fix #1: toggle is its own click target, not nested in header onclick */
+.m-toggle{width:38px;height:21px;border-radius:11px;background:var(--border);position:relative;transition:background .25s;flex-shrink:0;cursor:pointer;}
+.m-toggle.on{background:var(--accent);}
+.m-toggle-knob{position:absolute;top:2.5px;left:2.5px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .25s;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.m-toggle.on .m-toggle-knob{transform:translateX(17px);}
+.m-card-body{border-top:1px solid var(--border);}
+.m-card-body.collapsed{display:none;}
+
+/* ── FIELD ROWS ── */
+.field-rows-wrap{background:var(--surface2);}
+.field-row{display:flex;align-items:center;border-bottom:1px solid var(--border);}
+.field-row:last-child{border-bottom:none;}
+.field-row-label{font-family:var(--fm);font-size:11px;color:var(--muted);white-space:nowrap;min-width:108px;padding:0 14px;flex-shrink:0;}
+.field-row input{background:transparent;border:none;outline:none;padding:13px 14px 13px 0;color:var(--text);font-family:var(--fm);font-size:15px;text-align:right;flex:1;width:100%;}
+.field-row input::placeholder{color:var(--border);font-size:13px;}
+.field-row input:focus{background:var(--accent-dim);}
+/* ── ODD STEPPER [+ / -] ── */
+.odd-step-btn{width:24px;height:24px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--dim);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;flex-shrink:0;user-select:none;margin:0 2px;}
+.odd-step-btn:hover{background:var(--accent-dim);border-color:var(--accent-b);color:var(--accent);}
+.odd-step-btn:active{transform:scale(.9);}
+.field-row.has-stepper{padding-right:10px;}
+.field-row.has-stepper input{text-align:right;padding-right:8px;}
+/* placar hint (fix #11) */
+.score-hint{font-family:var(--fm);font-size:10px;color:var(--muted);padding:9px 14px;letter-spacing:.3px;border-bottom:1px solid var(--border);}
+
+/* ── PLACAR ROWS ── */
+.score-rows{display:flex;flex-direction:column;}
+.score-row{display:flex;align-items:center;border-bottom:1px solid var(--border);}
+.score-row:last-child{border-bottom:none;}
+.score-lbl{font-family:var(--fm);font-size:13px;font-weight:700;color:var(--muted);min-width:52px;text-align:center;padding:12px 8px;transition:color .25s;flex-shrink:0;}
+.score-lbl.danger{color:var(--red);}
+.score-lbl.top{color:var(--green);}
+.score-row input{background:transparent;border:none;outline:none;flex:1;padding:12px 0;color:var(--text);font-family:var(--fm);font-size:14px;text-align:right;}
+.score-row input::placeholder{color:var(--border);font-size:12px;}
+.score-row input:focus{background:var(--accent-dim);}
+.score-rank{font-family:var(--fm);font-size:9px;color:var(--muted);min-width:30px;text-align:center;flex-shrink:0;}
+.adv-toggle-btn{display:flex;align-items:center;justify-content:center;gap:7px;margin:9px 16px;background:transparent;border:1px dashed var(--border);border-radius:8px;padding:8px;color:var(--muted);font-family:var(--fm);font-size:10px;cursor:pointer;transition:all .2s;width:calc(100% - 32px);letter-spacing:.5px;}
+.adv-toggle-btn:hover{border-color:var(--accent);color:var(--accent);}
+.adv-rows{display:none;flex-direction:column;}
+.adv-rows.show{display:flex;}
+.adv-wrap{background:var(--surface2);border-top:1px dashed var(--border);}
+
+/* ── BTN PRIMARY ── */
+.btn-primary{width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--r);color:#fff;font-family:var(--fd);font-weight:700;font-size:14px;cursor:pointer;transition:all .2s;margin-top:12px;}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-sm{padding:9px 15px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--dim);font-family:var(--fb);font-weight:600;font-size:13px;cursor:pointer;transition:all .2s;}
+.btn-sm:hover{border-color:var(--accent);color:var(--text);}
+.btn-sm.green{background:var(--green-dim);border-color:var(--green-b);color:var(--green);}
+.btn-sm.blue{background:var(--accent-dim);border-color:var(--accent-b);color:var(--accent);}
+
+/* ── FAB (#9) ── */
+.fab{position:fixed;bottom:24px;right:20px;z-index:60;display:none;align-items:center;gap:8px;background:var(--accent);border:none;border-radius:28px;padding:13px 22px;color:#fff;font-family:var(--fd);font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 24px rgba(74,111,255,.45);transition:all .2s;}
+.fab.visible{display:flex;}
+.fab:hover{filter:brightness(1.1);}
+
+/* ── LOADING ── */
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(13,15,20,.9);backdrop-filter:blur(5px);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+html.light .loading-overlay{background:rgba(240,242,248,.88);}
+.loading-overlay.show{display:flex;}
+.lr{width:64px;height:64px;position:relative;}
+.lr-ring{position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:var(--accent);animation:spin 1s linear infinite;}
+.lr-ring:nth-child(2){inset:9px;border-top-color:var(--green);animation-duration:1.4s;animation-direction:reverse;}
+.lr-ring:nth-child(3){inset:18px;border-top-color:var(--yellow);animation-duration:1.8s;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-step{font-family:var(--fd);font-weight:600;font-size:14px;}
+.loading-sub{font-family:var(--fm);font-size:10px;color:var(--dim);letter-spacing:1px;}
+
+/* ── RESULT ── */
+.result-section{display:none;}.result-section.show{display:block;}
+.result-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.result-league{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;}
+.result-match{font-family:var(--fd);font-weight:800;font-size:20px;}
+.result-ts{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:11px;}
+.metric-card{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px 9px;}
+.metric-label{font-family:var(--fm);font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;}
+.metric-status{font-size:16px;margin-bottom:3px;}
+.metric-pts{font-family:var(--fb);font-size:12px;color:var(--dim);font-weight:600;}
+.metric-detail{font-family:var(--fm);font-size:8px;color:var(--muted);margin-top:3px;line-height:1.3;}
+.score-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:15px;margin-bottom:11px;}
+.score-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.score-num{font-family:var(--fd);font-weight:800;font-size:28px;line-height:1;}
+.score-pills{display:flex;gap:5px;}
+.pill{font-family:var(--fm);font-size:9px;padding:3px 9px;border-radius:20px;}
+.pill-g{background:var(--green-dim);color:var(--green);}
+.pill-y{background:var(--yellow-dim);color:var(--yellow);}
+.pill-r{background:var(--red-dim);color:var(--red);}
+.bar-bg{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;transition:width 1s cubic-bezier(.16,1,.3,1);}
+.bar-labels{display:flex;justify-content:space-between;margin-top:4px;}
+.bar-label{font-family:var(--fm);font-size:8px;color:var(--muted);}
+.result-actions{display:flex;gap:7px;margin-top:14px;flex-wrap:wrap;}
+
+/* ── OP REPORT ── */
+.op-banner{display:flex;align-items:center;gap:12px;border:1px solid;border-radius:var(--r);padding:15px 17px;margin-bottom:10px;}
+.op-banner-emoji{font-size:26px;line-height:1;}
+.op-banner-label{font-family:var(--fd);font-weight:800;font-size:17px;}
+.op-block{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:15px 16px;margin-bottom:9px;}
+.op-block-title{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:11px;}
+.op-readings{display:flex;flex-direction:column;gap:8px;}
+.op-reading-row{display:flex;align-items:flex-start;gap:9px;font-family:var(--fb);font-size:13px;line-height:1.4;}
+.op-read-icon{font-size:13px;margin-top:1px;flex-shrink:0;}
+.op-subblock{margin-top:13px;padding-top:11px;border-top:1px solid var(--border);}
+.op-subblock-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:7px;}
+.op-scenarios{display:flex;flex-wrap:wrap;gap:6px;}
+.op-scenario-chip{background:var(--green-dim);border:1px solid var(--green-b);border-radius:7px;padding:6px 12px;font-family:var(--fm);font-size:13px;color:var(--green);font-weight:700;}
+.op-scenario-warn{margin-top:9px;font-family:var(--fb);font-size:12px;color:var(--yellow);background:var(--yellow-dim);border:1px solid var(--yellow-b);border-radius:7px;padding:7px 12px;}
+.op-stake-row{display:flex;align-items:stretch;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:9px;}
+.op-context-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+.op-context-league{font-family:var(--fd);font-weight:700;font-size:14px;}
+.op-context-profile{font-family:var(--fm);font-size:10px;font-weight:700;padding:3px 10px;border:1px solid;border-radius:20px;letter-spacing:.5px;}
+.op-context-desc{font-family:var(--fb);font-size:13px;color:var(--dim);line-height:1.5;}
+.op-context-lift{margin-top:9px;font-family:var(--fm);font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-b);border-radius:7px;padding:7px 11px;}
+
+/* ── CATALOG DETAIL MODAL ── */
+.cd-section{margin-bottom:16px;}
+.cd-section-title{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px;}
+.cd-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.cd-info-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.cd-info-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px;}
+.cd-info-val{font-family:var(--fb);font-size:13px;font-weight:600;color:var(--text);}
+.cd-score-pair{display:flex;align-items:center;justify-content:center;gap:14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.cd-score-block{text-align:center;}
+.cd-score-block-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;}
+.cd-score-block-val{font-family:var(--fd);font-weight:800;font-size:22px;}
+.cd-rec-card{border-radius:10px;padding:14px;border:1px solid;margin-bottom:10px;}
+.cd-rec-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.cd-rec-label{font-family:var(--fd);font-weight:700;font-size:14px;}
+.cd-rec-market{font-family:var(--fm);font-size:12px;color:var(--dim);}
+.cd-market-card{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:7px;}
+.cd-market-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.cd-market-name{font-family:var(--fb);font-weight:700;font-size:13px;}
+.cd-market-pts{font-family:var(--fm);font-size:12px;font-weight:700;}
+.cd-market-detail{font-family:var(--fm);font-size:11px;color:var(--muted);}
+.cd-dist-row{display:flex;gap:8px;margin-top:8px;}
+.cd-op-result{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:13px 15px;}
+.cd-op-result.hit{border-color:var(--green-b);background:var(--green-dim);}
+.cd-op-result.miss{border-color:var(--red-b);background:var(--red-dim);}
+.cd-op-result-label{font-family:var(--fb);font-weight:600;font-size:13px;}
+.cd-op-result-status{font-family:var(--fd);font-weight:700;font-size:13px;}
+.cd-zero-highlight{display:flex;align-items:center;gap:9px;background:var(--orange-dim);border:1px solid var(--orange-b);border-radius:9px;padding:12px 15px;margin-top:10px;font-family:var(--fd);font-weight:700;font-size:14px;color:var(--orange);}
+.op-stake-item{flex:1;padding:13px 16px;display:flex;flex-direction:column;gap:4px;}
+.op-stake-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+.op-stake-val{font-family:var(--fd);font-weight:800;font-size:16px;}
+.op-stake-divider{width:1px;background:var(--border);}
+.op-plan-block{border-left:3px solid !important;}
+.op-plan-headline{font-family:var(--fd);font-weight:700;font-size:14px;margin-bottom:7px;}
+.op-plan-detail{font-family:var(--fb);font-size:13px;color:var(--dim);line-height:1.6;}
+.op-adj-block{border-color:var(--red-b) !important;background:var(--red-dim) !important;}
+.op-adj-block .op-block-title{color:var(--red);}
+.op-adj-item{display:flex;flex-direction:column;gap:4px;}
+.op-adj-market{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.op-adj-row{display:flex;align-items:center;gap:9px;}
+.op-adj-val{font-family:var(--fm);font-size:15px;font-weight:700;}
+.op-adj-arrow{font-size:17px;}
+.op-adj-ideal{font-family:var(--fb);font-size:13px;color:var(--dim);}
+.op-adj-msg{font-family:var(--fb);font-size:13px;color:var(--dim);font-weight:600;}
+.op-adj-sep{height:1px;background:var(--red-b);margin:9px 0;}
+/* copy report button (#14) */
+.btn-copy-report{display:flex;align-items:center;gap:7px;background:transparent;border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--muted);font-family:var(--fm);font-size:10px;cursor:pointer;transition:all .2s;letter-spacing:.5px;}
+.btn-copy-report:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── EDIT BUTTON ── */
+.btn-edit{display:inline-flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);border-radius:7px;padding:5px 11px;color:var(--muted);font-family:var(--fm);font-size:10px;cursor:pointer;transition:all .2s;letter-spacing:.3px;flex-shrink:0;}
+.btn-collapse-score{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--muted);font-family:var(--fm);font-size:10px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-collapse-score:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.btn-edit:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.result-header-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+/* locked badge in bilhete */
+.bc-locked{display:flex;align-items:center;gap:6px;padding:9px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:.5px;}
+
+
+/* ── BILHETE STEP FLOW ── */
+.bc-step-group{flex:1;}
+.bc-step-label-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+.bc-step-label{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.bc-step-status{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:20px;}
+.bc-step-status.pending{background:var(--surface2);color:var(--muted);}
+.bc-step-status.done{background:var(--green-dim);color:var(--green);border:1px solid var(--green-b);}
+.bc-step-locked-row{display:flex;align-items:center;gap:8px;padding:11px 0;color:var(--muted);font-family:var(--fm);font-size:11px;}
+.bc-step-confirm-btn{padding:8px 14px;background:var(--accent-dim);border:1px solid var(--accent-b);border-radius:7px;color:var(--accent);font-family:var(--fb);font-weight:700;font-size:12px;cursor:pointer;transition:all .2s;white-space:nowrap;margin-top:8px;}
+.bc-step-confirm-btn:hover{background:var(--accent);color:#fff;}
+.bc-step-confirm-btn:disabled{opacity:.35;cursor:not-allowed;}
+.bc-conclude-btn{width:100%;padding:13px;background:var(--green-dim);border:1px solid var(--green-b);border-radius:9px;color:var(--green);font-family:var(--fd);font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;margin-top:12px;}
+.bc-conclude-btn:hover{background:var(--green);color:#fff;}
+.bc-conclude-btn:disabled{opacity:.3;cursor:not-allowed;background:var(--surface2);border-color:var(--border);color:var(--muted);}
+.bc-edit-locked-note{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--orange-dim);border:1px solid var(--orange-b);border-radius:7px;font-family:var(--fm);font-size:10px;color:var(--orange);margin-bottom:10px;}
+.bc-update-odds-btn{align-self:flex-start;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--dim);font-family:var(--fb);font-weight:600;font-size:12px;cursor:pointer;transition:all .2s;}
+.bc-update-odds-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.bc-variation-block{padding:13px 15px;border-bottom:1px solid var(--border);background:var(--surface2);}
+.bc-variation-title{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+.bc-variation-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;font-size:12px;}
+.bc-variation-market{font-family:var(--fb);font-weight:600;color:var(--text);flex:1;}
+.bc-variation-vals{font-family:var(--fm);font-size:11px;color:var(--dim);}
+.bc-var-initial{color:var(--muted);text-decoration:line-through;}
+.bc-var-current{color:var(--text);font-weight:700;}
+.bc-variation-delta{font-family:var(--fm);font-size:11px;font-weight:700;min-width:54px;text-align:right;}
+/* ── BILHETES ── */
+.bc{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:11px;}
+.bc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:11px;padding:14px 15px;border-bottom:1px solid var(--border);}
+.bc-top-left{display:flex;flex-direction:column;gap:3px;}
+.bc-liga-top{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.bc-match-top{font-family:var(--fd);font-weight:700;font-size:16px;line-height:1.3;}
+.bc-top-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.bc-pts-block{text-align:right;}
+.bc-del-x{width:26px;height:26px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;transition:all .2s;flex-shrink:0;}
+.bc-del-x:hover{background:var(--red-dim);border-color:var(--red-b);color:var(--red);}
+.bc-badge{padding:3px 9px;border-radius:20px;font-family:var(--fm);font-size:9px;border:1px solid;flex-shrink:0;}
+.bc-badge.green{background:var(--green-dim);color:var(--green);border-color:var(--green-b);}
+.bc-badge.yellow{background:var(--yellow-dim);color:var(--yellow);border-color:var(--yellow-b);}
+.bc-badge.orange{background:var(--orange-dim);color:var(--orange);border-color:var(--orange-b);}
+.bc-badge.red{background:var(--red-dim);color:var(--red);border-color:var(--red-b);}
+.bc-match{font-family:var(--fd);font-weight:700;font-size:14px;flex:1;}
+.bc-liga{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.bc-metrics{padding:10px 15px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;border-bottom:1px solid var(--border);}
+.bc-mi{display:flex;flex-direction:column;gap:2px;}
+.bc-mi-label{font-family:var(--fm);font-size:8px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;}
+.bc-mi-val{font-family:var(--fm);font-size:11px;}
+/* fix #10: HT/FT split numeric inputs */
+.bc-result-row{padding:12px 15px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+.bc-score-wrap{display:flex;align-items:center;gap:6px;flex:1;min-width:180px;}
+.bc-score-group{display:flex;flex-direction:column;gap:3px;flex:1;}
+.bc-score-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.bc-score-inputs{display:flex;align-items:center;gap:4px;}
+.bc-score-num{width:44px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 4px;font-family:var(--fm);font-size:14px;color:var(--text);outline:none;transition:border-color .2s;}
+.bc-score-num:focus{border-color:var(--accent);}
+.bc-score-sep{font-family:var(--fm);font-size:13px;color:var(--muted);}
+.bc-confirm{padding:10px 14px;background:var(--green-dim);border:1px solid var(--green-b);border-radius:8px;color:var(--green);font-family:var(--fb);font-weight:700;font-size:12px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.bc-confirm:hover{background:var(--green);color:#fff;}
+.bc-del{padding:10px 11px;background:var(--red-dim);border:1px solid var(--red-b);border-radius:8px;color:var(--red);font-family:var(--fm);font-size:12px;cursor:pointer;transition:all .2s;}
+.bc-del:hover{background:var(--red);color:#fff;}
+
+/* ── CATALOGAÇÃO ── */
+.stats-bar{display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;}
+.stat-it{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;flex:1;min-width:80px;}
+.stat-val{font-family:var(--fd);font-weight:800;font-size:21px;}
+.stat-lab{font-family:var(--fm);font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.cat-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.cat-f{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 11px;font-family:var(--fm);font-size:10px;color:var(--muted);cursor:pointer;transition:all .2s;}
+.cat-f:hover,.cat-f.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.cat-f select{background:transparent;border:none;color:inherit;font-family:inherit;font-size:inherit;cursor:pointer;outline:none;}
+.cat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:8px;transition:border-color .2s;}
+.cat-card:hover{border-color:var(--accent-b);}
+.cat-row{display:flex;align-items:center;gap:11px;padding:12px 15px;}
+.cat-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.cat-info{flex:1;min-width:0;}
+.cat-match{font-family:var(--fb);font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cat-sub{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;}
+.cat-scores{display:flex;gap:6px;flex-shrink:0;}
+.cat-sbox{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;text-align:center;}
+.cat-slabel{font-family:var(--fm);font-size:7px;color:var(--muted);letter-spacing:1px;}
+.cat-sval{font-family:var(--fm);font-size:12px;font-weight:700;margin-top:1px;}
+.cat-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;}
+.cat-pts{font-family:var(--fm);font-size:11px;}
+.cat-date{font-family:var(--fm);font-size:9px;color:var(--muted);}
+
+/* ── 0x0 PANEL ── */
+.zero-panel{display:none;position:fixed;inset:0;z-index:300;background:rgba(13,15,20,.93);backdrop-filter:blur(6px);overflow-y:auto;}
+.zero-panel.show{display:block;}
+.zero-inner{max-width:580px;margin:40px auto;padding:20px 16px;}
+.zero-ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.zero-title{font-family:var(--fd);font-weight:800;font-size:17px;color:var(--orange);}
+.zero-close{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 13px;color:var(--dim);font-family:var(--fb);font-weight:600;font-size:12px;cursor:pointer;}
+.zero-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.zero-item{background:var(--surface);border:1px solid var(--orange-b);border-left:3px solid var(--orange);border-radius:10px;padding:13px 15px;margin-bottom:8px;}
+.zero-match{font-family:var(--fd);font-weight:700;font-size:14px;margin-bottom:5px;}
+.zero-meta{display:flex;gap:11px;flex-wrap:wrap;}
+.zero-meta span{font-family:var(--fm);font-size:9px;color:var(--muted);}
+
+/* ── INFO MODAL ── */
+.overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(13,15,20,.88);backdrop-filter:blur(6px);overflow-y:auto;padding:20px 14px;}
+.overlay.show{display:flex;align-items:flex-start;justify-content:center;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:520px;overflow:hidden;margin:auto;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:17px 20px;border-bottom:1px solid var(--border);}
+.modal-title{font-family:var(--fd);font-weight:800;font-size:16px;}
+.modal-close{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;color:var(--dim);font-family:var(--fb);font-weight:600;font-size:12px;cursor:pointer;}
+.modal-body{padding:18px 20px;display:flex;flex-direction:column;gap:14px;max-height:72vh;overflow-y:auto;}
+.info-sec{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px;display:flex;flex-direction:column;gap:8px;}
+.info-sec-title{font-family:var(--fd);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.info-weight{font-family:var(--fm);font-size:9px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-b);border-radius:20px;padding:2px 8px;}
+.info-row{display:flex;align-items:flex-start;gap:9px;font-family:var(--fb);font-size:13px;line-height:1.4;}
+.i-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.i-dot.g{background:var(--green);}
+.i-dot.y{background:var(--yellow);}
+.i-dot.r{background:var(--red);}
+.info-scoring{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px;}
+.info-scoring-title{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px;}
+.info-scoring-row{display:flex;align-items:center;gap:8px;font-family:var(--fb);font-size:13px;margin-bottom:5px;}
+.info-max{margin-top:9px;font-family:var(--fm);font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-b);border-radius:7px;padding:6px 12px;text-align:center;}
+.info-thr{display:flex;flex-direction:column;gap:6px;}
+.info-thr-row{font-family:var(--fb);font-size:13px;padding:8px 13px;border-radius:8px;border:1px solid;}
+.thr-g{background:var(--green-dim);border-color:var(--green-b);}
+.thr-y{background:var(--yellow-dim);border-color:var(--yellow-b);}
+.thr-o{background:var(--orange-dim);border-color:var(--orange-b);}
+.thr-r{background:var(--red-dim);border-color:var(--red-b);}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:44px 20px;}
+.empty-icon{font-size:36px;margin-bottom:11px;}
+.empty-title{font-family:var(--fd);font-weight:700;font-size:15px;margin-bottom:5px;}
+.empty-desc{font-size:13px;color:var(--muted);line-height:1.5;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:10px;font-family:var(--fd);font-weight:600;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.3);}
+.toast.show{opacity:1;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:580px){
+  .metrics-row,.bc-metrics{grid-template-columns:repeat(2,1fr);}
+  .result-actions{flex-direction:column;}
+  .cat-scores{display:none;}
+  .nav-tab{font-size:11px;padding:10px 10px;}
+}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="loading-overlay" id="loading">
+  <div class="lr"><div class="lr-ring"></div><div class="lr-ring"></div><div class="lr-ring"></div></div>
+  <div class="loading-step" id="loadingStep">Calculando...</div>
+  <div class="loading-sub">Aplicando critérios GOL$ NA COPA</div>
+</div>
+
+<!-- 0x0 PANEL -->
+<div class="zero-panel" id="zeroPanel">
+  <div class="zero-inner">
+    <div class="zero-ph">
+      <div class="zero-title">🎯 Jogos em Observação — 0×0</div>
+      <button class="zero-close" onclick="closeZero()">✕ Fechar</button>
+    </div>
+    <p class="zero-sub">Partidas catalogadas com resultado 0×0. Estatisticamente incomum repetir consecutivos — atenção especial em reanálises.</p>
+    <div id="zeroList"></div>
+  </div>
+</div>
+
+<!-- INFO MODAL -->
+<div class="overlay" id="infoOverlay" onclick="if(event.target===this)closeInfo()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Guia da Metodologia</div>
+      <button class="modal-close" onclick="closeInfo()">✕ Fechar</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-sec">
+        <div class="info-sec-title">📊 Resultado da Partida <span class="info-weight">Peso ×1</span></div>
+        <div class="info-row"><span class="i-dot g"></span><div><strong>Verde</strong> — Favorito &lt; 1.60 e Zebra &gt; 5.00</div></div>
+        <div class="info-row"><span class="i-dot y"></span><div><strong>Amarelo</strong> — Favorito 1.60–2.00 ou Zebra 4.00–5.00</div></div>
+        <div class="info-row"><span class="i-dot r"></span><div><strong>Vermelho</strong> — Favorito &gt; 2.00 ou Zebra &lt; 4.00</div></div>
+      </div>
+      <div class="info-sec">
+        <div class="info-sec-title">⚽ Mais de 2.5 Gols <span class="info-weight">Peso ×2</span></div>
+        <div class="info-row"><span class="i-dot g"></span><div><strong>Verde</strong> — Odd do Mais de 2.5 abaixo de 1.70</div></div>
+        <div class="info-row"><span class="i-dot y"></span><div><strong>Amarelo</strong> — Entre 1.70 e 2.10</div></div>
+        <div class="info-row"><span class="i-dot r"></span><div><strong>Vermelho</strong> — Menos de 2.5 como favorito (abaixo de 1.70)</div></div>
+      </div>
+      <div class="info-sec">
+        <div class="info-sec-title">🎯 Ambas Marcam <span class="info-weight">Peso ×1</span></div>
+        <div class="info-row"><span class="i-dot g"></span><div><strong>Verde</strong> — Odd do SIM menor que a do NÃO</div></div>
+        <div class="info-row"><span class="i-dot y"></span><div><strong>Amarelo</strong> — Diferença inferior a 0.20</div></div>
+        <div class="info-row"><span class="i-dot r"></span><div><strong>Vermelho</strong> — Odd do NÃO claramente menor que SIM</div></div>
+      </div>
+      <div class="info-sec">
+        <div class="info-sec-title">🔢 Placar Exato <span class="info-weight">Peso ×2</span></div>
+        <div class="info-row"><span class="i-dot g"></span><div><strong>Verde</strong> — 2x0, 2x1, 1x2, 2x2 ou 3x0 entre os placares mais baratos</div></div>
+        <div class="info-row"><span class="i-dot y"></span><div><strong>Amarelo</strong> — 1x0, 0x1 ou 1x1 liderando</div></div>
+        <div class="info-row"><span class="i-dot r"></span><div><strong>Vermelho</strong> — 0x0 entre os mais protegidos</div></div>
+      </div>
+      <div class="info-scoring">
+        <div class="info-scoring-title">Sistema de Pontuação</div>
+        <div class="info-scoring-row"><span class="i-dot g"></span> Verde = 2 pts × peso</div>
+        <div class="info-scoring-row"><span class="i-dot y"></span> Amarelo = 1 pt × peso</div>
+        <div class="info-scoring-row"><span class="i-dot r"></span> Vermelho = 0 pts</div>
+        <div class="info-max">Pontuação máxima: 12 pontos</div>
+      </div>
+      <div class="info-thr">
+        <div class="info-thr-row thr-g">🟢 Entrada para +1.5 → 75%+ da pontuação máxima</div>
+        <div class="info-thr-row thr-y">🟡 Entrada para +0.5 → 42–74%</div>
+        <div class="info-thr-row thr-o">🟠 Aguardar ajuste → 25–41%</div>
+        <div class="info-thr-row thr-r">🔴 Não recomendado → abaixo de 25%</div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn-primary" style="margin:0" onclick="closeInfo()">Fechar</button></div>
+  </div>
+</div>
+
+<!-- RESTORE CONFIRM MODAL -->
+<div class="overlay" id="restoreOverlay" onclick="if(event.target===this)closeRestoreModal()">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <div class="modal-title">🗑 Restaurar Ferramenta</div>
+      <button class="modal-close" onclick="closeRestoreModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--fb);font-size:14px;color:var(--text);line-height:1.6;">
+        <strong>ATENÇÃO:</strong> Esta ação removerá todos os dados da ferramenta — análises, bilhetes pendentes, jogos catalogados, destaques 0×0 e preferências. Esta ação não pode ser desfeita.
+      </p>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;">
+      <button class="btn-sm" style="flex:1;" onclick="closeRestoreModal()">Cancelar</button>
+      <button class="btn-sm" style="flex:1;background:var(--red-dim);border-color:var(--red-b);color:var(--red);" onclick="restoreAll()">Restaurar Tudo</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="overlay" id="exportOverlay" onclick="if(event.target===this)closeExportModal()">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <div class="modal-title">📤 Exportar Dados</div>
+      <button class="modal-close" onclick="closeExportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--fb);font-size:13px;color:var(--dim);margin-bottom:14px;">Inclui bilhetes pendentes, jogos catalogados, destaques 0×0 e estatísticas gerais.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="settings-action" style="background:var(--surface2);border:1px solid var(--border);" onclick="exportData('json')"><span>🗂️</span> Exportar como JSON</button>
+        <button class="settings-action" style="background:var(--surface2);border:1px solid var(--border);" onclick="exportData('csv')"><span>📊</span> Exportar como CSV</button>
+        <button class="settings-action" style="background:var(--surface2);border:1px solid var(--border);opacity:.45;cursor:not-allowed;" title="Em breve"><span>📈</span> Exportar como Excel (.xlsx) — em breve</button>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn-primary" style="margin:0" onclick="closeExportModal()">Fechar</button></div>
+  </div>
+</div>
+
+<!-- DISCARD BILHETE MODAL -->
+<div class="overlay" id="discardOverlay" onclick="if(event.target===this)closeDiscardModal()">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-header">
+      <div class="modal-title">🗑 Descartar bilhete?</div>
+      <button class="modal-close" onclick="closeDiscardModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="discard-modal-text">Este bilhete será removido permanentemente e não entrará na Catalogação. Esta ação não pode ser desfeita.</p>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;">
+      <button class="btn-sm" style="flex:1;" onclick="closeDiscardModal()">Cancelar</button>
+      <button class="btn-sm" style="flex:1;background:var(--red-dim);border-color:var(--red-b);color:var(--red);" onclick="discardBilheteConfirmed()">Descartar</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPDATE ODDS MODAL -->
+<div class="overlay" id="updateOddsOverlay" onclick="if(event.target===this)closeUpdateOddsModal()">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">📈 Atualizar Odds</div>
+      <button class="modal-close" onclick="closeUpdateOddsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-family:var(--fb);font-size:12px;color:var(--dim);margin-bottom:14px;">Ajuste apenas as odds. Resultado HT/FT e dados catalogados não serão alterados.</p>
+      <div id="updateOddsFields"></div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;">
+      <button class="btn-sm" style="flex:1;" onclick="closeUpdateOddsModal()">Cancelar</button>
+      <button class="btn-sm" style="flex:1;background:var(--accent-dim);border-color:var(--accent-b);color:var(--accent);" onclick="saveUpdatedOdds()">Salvar e Recalcular</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATALOG DETAIL MODAL -->
+<div class="overlay" id="catalogDetailOverlay" onclick="if(event.target===this)closeCatalogDetail()">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="catDetailTitle">📚 Detalhes da Análise</div>
+      <button class="modal-close" onclick="closeCatalogDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="catDetailBody"></div>
+    <div class="modal-footer"><button class="btn-primary" style="margin:0" onclick="closeCatalogDetail()">Fechar</button></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <div class="logo-name"><span>$canner</span>Gol</div>
+    <div class="logo-sub">Scanner Inteligente de Mercado de Gols</div>
+  </div>
+  <div class="header-right">
+    <button class="btn-zero" onclick="openZero()">🎯 0×0 <span class="zero-badge" id="zeroCnt">0</span></button>
+    <button class="btn-icon" onclick="openInfo()" title="Metodologia">ⓘ</button>
+    <div class="settings-wrap">
+      <button class="btn-icon" onclick="toggleSettings(event)" title="Configurações">⚙️</button>
+      <div class="settings-menu" id="settingsMenu">
+        <div class="settings-sec-label">Aparência</div>
+        <div class="theme-opt" id="opt-dark" onclick="setTheme('dark')"><span>🌙</span> Modo Escuro</div>
+        <div class="theme-opt" id="opt-light" onclick="setTheme('light')"><span>☀️</span> Modo Claro</div>
+        <div class="settings-sec-divider"></div>
+        <div class="settings-sec-label">Dados</div>
+        <div class="settings-action" onclick="openExportModal()"><span>📤</span> Exportar Dados</div>
+        <div class="settings-action" onclick="document.getElementById('importFileInput').click()"><span>📥</span> Importar Dados</div>
+        <input type="file" id="importFileInput" accept=".json" onchange="handleImportFile(event)">
+        <div class="settings-sec-divider"></div>
+        <div class="settings-action danger" onclick="confirmRestore()"><span>🗑</span> Restaurar Ferramenta</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS BAR (#8) -->
+<div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
+
+<!-- NAV -->
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="goPage('analyze',this)">⚡ Análise</button>
+  <button class="nav-tab" onclick="goPage('bilhetes',this)">🎫 Bilhetes <span class="tab-pill" id="pill-b">0</span></button>
+  <button class="nav-tab" onclick="goPage('catalog',this)">📚 Catalogação <span class="tab-pill" id="pill-c">0</span></button>
+</div>
+
+<!-- FAB (#9) -->
+<button class="fab" id="fab" onclick="runAnalysis()">Analisar →</button>
+
+<div class="main">
+
+<!-- ═══ PAGE: ANÁLISE ═══ -->
+<div class="page active" id="page-analyze">
+  <div id="inputSection">
+    <div class="sec-label">Nova Análise</div>
+
+    <!-- 01 -->
+    <div class="m-card" id="mc-id">
+      <div class="m-card-header">
+        <div class="m-card-left">
+          <div class="m-card-num">01</div>
+          <div><div class="m-card-title">Identificação</div><div class="m-card-sub">Liga e confronto</div></div>
+        </div>
+        <div class="m-card-right"><div class="status-dot" id="dot-id"></div></div>
+      </div>
+      <div class="m-card-body">
+        <div class="field-rows-wrap">
+          <div class="field-row">
+            <span class="field-row-label">Liga</span>
+            <input type="text" id="f-league" placeholder="Ex: Champions League..." list="league-list" oninput="checkDots()">
+          </div>
+          <div class="field-row">
+            <span class="field-row-label">Mandante</span>
+            <input type="text" id="f-teamA" placeholder="Ex: Real Madrid" list="team-list" oninput="checkDots()">
+          </div>
+          <div class="field-row">
+            <span class="field-row-label">Visitante</span>
+            <input type="text" id="f-teamB" placeholder="Ex: Barcelona" list="team-list" oninput="checkDots()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 fix #1: toggle has own onclick, header expands/collapses body -->
+    <div class="m-card" id="mc-res">
+      <div class="m-card-header clickable" onclick="expandCard('res')">
+        <div class="m-card-left">
+          <div class="m-card-num">02</div>
+          <div><div class="m-card-title">Resultado da Partida</div><div class="m-card-sub">Odds 1×2 · Peso ×1</div></div>
+        </div>
+        <div class="m-card-right">
+          <div class="status-dot" id="dot-res"></div>
+          <div class="m-toggle on" id="tog-res" onclick="event.stopPropagation();toggleCard('res')"><div class="m-toggle-knob"></div></div>
+        </div>
+      </div>
+      <div class="m-card-body" id="body-res">
+        <div class="field-rows-wrap">
+          <div class="field-row">
+            <span class="field-row-label">Time A</span>
+            <span class="odd-step-btn" onclick="stepOdd('f-oddA',-1)">−</span><input type="text" id="f-oddA" placeholder="1.55" inputmode="numeric" oninput="autoOdd(this)" onblur="finalizeOdd(this);checkDots()" class="has-stepper"><span class="odd-step-btn" onclick="stepOdd('f-oddA',1)">+</span>
+          </div>
+          <div class="field-row">
+            <span class="field-row-label">Empate</span>
+            <span class="odd-step-btn" onclick="stepOdd('f-empate',-1)">−</span><input type="text" id="f-empate" placeholder="4.20" inputmode="numeric" oninput="autoOdd(this)" onblur="finalizeOdd(this)" class="has-stepper"><span class="odd-step-btn" onclick="stepOdd('f-empate',1)">+</span>
+          </div>
+          <div class="field-row">
+            <span class="field-row-label">Time B</span>
+            <span class="odd-step-btn" onclick="stepOdd('f-oddB',-1)">−</span><input type="text" id="f-oddB" placeholder="6.50" inputmode="numeric" oninput="autoOdd(this)" onblur="finalizeOdd(this);checkDots()" class="has-stepper"><span class="odd-step-btn" onclick="stepOdd('f-oddB',1)">+</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03 -->
+    <div class="m-card" id="mc-ou">
+      <div class="m-card-header clickable" onclick="expandCard('ou')">
+        <div class="m-card-left">
+          <div class="m-card-num">03</div>
+          <div><div class="m-card-title">Mais / Menos 2.5 Gols</div><div class="m-card-sub">Over · Under · Peso ×2</div></div>
+        </div>
+        <div class="m-card-right">
+          <div class="status-dot" id="dot-ou"></div>
+          <div class="m-toggle on" id="tog-ou" onclick="event.stopPropagation();toggleCard('ou')"><div class="m-toggle-knob"></div></div>
+        </div>
+      </div>
+      <div class="m-card-body" id="body-ou">
+        <div class="field-rows-wrap">
+          <div class="field-row">
+            <span class="field-row-label">Mais de 2.5</span>
+            <span class="odd-step-btn" onclick="stepOdd('f-over',-1)">−</span><input type="text" id="f-over" placeholder="1.65" inputmode="numeric" oninput="autoOdd(this)" onblur="finalizeOdd(this);checkDots()" class="has-stepper"><span class="odd-step-btn" onclick="stepOdd('f-over',1)">+</span>
+          </div>
+          <div class="field-row">
+            <span class="field-row-label">Menos de 2.5</span>
+            <span class="odd-step-btn" onclick="stepOdd('f-under',-1)">−</span><input type="text" id="f-under" placeholder="2.30" inputmode="numeric" oninput="autoOdd(this)" onblur="finalizeOdd(this);checkDots()" class="has-stepper"><span class="odd-step-btn" onclick="stepOdd('f-under',1)">+</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 04 -->
+    <div class="m-card" id="mc-btts">
+      <div class="m-card-header clickable" onclick="expandCard('btts')">
+        <div class="m-card-left">
+          <div class="m-card-num">04</div>
+          <div><div class="m-card-title">Ambas Marcam</div><div class="m-card-sub">BTTS · Peso ×1</div></div>
+        </div>
+        <div class="m-card-right">
+          <div class="status-dot" id="dot-btts"></div>
+          <div class="m-toggle on" id="tog-btts" onclick="event.stopPropagation();toggleCard('btts')"><div class="m-toggle-knob"></div></div>
+        </div>
+      </div>
+      <div class="m-card-body" id="body-btts">
+        <div class="field-rows-wrap">
+          <div class="field-row">
+            <span class="field-row-label">SIM</span>
+            <span class="odd-step-btn" onclick="stepOdd('f-sim',-1)">−</span><input type="text" id="f-sim" placeholder="1.80" inputmode="numeric" oninput="autoOdd(this)" onblur="finalizeOdd(this);checkDots()" class="has-stepper"><span class="odd-step-btn" onclick="stepOdd('f-sim',1)">+</span>
+          </div>
+          <div class="field-row">
+            <span class="field-row-label">NÃO</span>
+            <span class="odd-step-btn" onclick="stepOdd('f-nao',-1)">−</span><input type="text" id="f-nao" placeholder="2.10" inputmode="numeric" oninput="autoOdd(this)" onblur="finalizeOdd(this);checkDots()" class="has-stepper"><span class="odd-step-btn" onclick="stepOdd('f-nao',1)">+</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 05 fix #11: instrução mínima no placar -->
+    <div class="m-card" id="mc-pc">
+      <div class="m-card-header clickable" onclick="expandCard('pc')">
+        <div class="m-card-left">
+          <div class="m-card-num">05</div>
+          <div><div class="m-card-title">Placar Exato</div><div class="m-card-sub">Correct Score · Peso ×2</div></div>
+        </div>
+        <div class="m-card-right">
+          <div class="status-dot" id="dot-pc"></div>
+          <div class="m-toggle on" id="tog-pc" onclick="event.stopPropagation();toggleCard('pc')"><div class="m-toggle-knob"></div></div>
+        </div>
+      </div>
+      <div class="m-card-body" id="body-pc">
+        <div class="field-rows-wrap">
+          <div class="score-hint">Preencha a odd de cada placar. A ferramenta identifica os top 5 automaticamente.</div>
+          <div class="score-rows" id="basicScores"></div>
+        </div>
+        <button class="adv-toggle-btn" id="advBtn" onclick="toggleAdv()">
+          ☑ Mais opções de placar <span id="advArrow">▾</span>
+        </button>
+        <div class="adv-rows" id="advScores">
+          <div class="adv-wrap field-rows-wrap"><div class="score-rows" id="advScoreRows"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="runAnalysis()">Analisar →</button>
+  </div>
+
+  <!-- RESULT -->
+  <div class="result-section" id="resultSection">
+    <div class="result-header">
+      <div>
+        <div class="result-league" id="r-league">—</div>
+        <div class="result-header-row">
+          <div class="result-match" id="r-match">—</div>
+          <button class="btn-edit" onclick="editAnalysis()" id="btnEdit">✏️ Editar</button>
+        </div>
+        <div id="r-fav-badge" style="display:none"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="result-ts" id="r-ts">—</div>
+        <button class="btn-collapse-score" id="btnCollapseScore" onclick="toggleScorePanel()" title="Ocultar/exibir pontuação">📊 <span id="collapseScoreLabel">Recolher</span></button>
+      </div>
+    </div>
+    <div id="scorePanel">
+      <div class="metrics-row" id="metricsRow"></div>
+      <div class="score-wrap">
+        <div class="score-header">
+          <div>
+            <div style="font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:3px;">PONTUAÇÃO</div>
+            <div class="score-num" id="scoreNum">0</div>
+          </div>
+          <div class="score-pills" id="scorePills"></div>
+        </div>
+        <div class="bar-bg"><div class="bar-fill" id="barFill" style="width:0%"></div></div>
+        <div class="bar-labels"><span class="bar-label">0</span><span class="bar-label" id="barMax">12</span></div>
+      </div>
+    </div>
+    <div id="opReport"></div>
+    <div class="result-actions">
+      <button class="btn-sm" onclick="resetForm()">↩ Nova Análise</button>
+      <button class="btn-sm green" onclick="sendToBilhetes()">🎫 Bilhetes</button>
+      <button class="btn-sm blue" onclick="saveDirect()">📚 Catalogar direto</button>
+      <button class="btn-copy-report" onclick="copyReport()" id="btnCopy">📋 Copiar relatório</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: BILHETES ═══ -->
+<div class="page" id="page-bilhetes">
+  <div class="sec-label">Aguardando Resultado</div>
+  <div id="bilhetesList"></div>
+</div>
+
+<!-- ═══ PAGE: CATALOGAÇÃO ═══ -->
+<div class="page" id="page-catalog">
+  <div class="stats-bar" id="statsBar"></div>
+  <div class="cat-filters">
+    <div class="cat-f active" onclick="setFilter('all',this)">Todos</div>
+    <div class="cat-f" onclick="setFilter('green',this)">🟢 +1.5G</div>
+    <div class="cat-f" onclick="setFilter('yellow',this)">🟡 +0.5G</div>
+    <div class="cat-f" onclick="setFilter('orange',this)">🟠 Aguardar</div>
+    <div class="cat-f" onclick="setFilter('red',this)">🔴 Fora</div>
+    <div class="cat-f" onclick="setFilter('with_goals',this)">⚽ Com gols</div>
+    <div class="cat-f" onclick="setFilter('no_goals',this)">🚫 Sem gols</div>
+    <div class="cat-f" style="padding:0;overflow:hidden;">
+      <select onchange="setLeague(this.value)" style="background:var(--surface2);border:none;color:var(--muted);font-family:var(--fm);font-size:10px;padding:6px 11px;cursor:pointer;outline:none;"><option value="">Todas as ligas</option></select>
+    </div>
+  </div>
+  <div id="catalogList"></div>
+</div>
+
+</div><!-- /main -->
+
+<datalist id="league-list">
+  <option value="Copa do Mundo"><option value="Eliminatórias UEFA"><option value="Eliminatórias CONMEBOL">
+  <option value="Champions League"><option value="Europa League"><option value="Conference League">
+  <option value="Brasileirão Série A"><option value="Brasileirão Série B"><option value="Copa do Brasil">
+  <option value="Libertadores"><option value="Sul-Americana"><option value="Premier League">
+  <option value="La Liga"><option value="Serie A"><option value="Bundesliga"><option value="Ligue 1">
+  <option value="Euro"><option value="Copa América"><option value="Nations League">
+</datalist>
+<datalist id="team-list"></datalist>
+
+<script>
+// ═══════════════════════════════════════════════
+// fix #6: localStorage for persistence
+// ═══════════════════════════════════════════════
+const DB = {
+  g: k => { try { return JSON.parse(localStorage.getItem('sg_'+k)||'null'); } catch { return null; } },
+  s: (k,v) => { try { localStorage.setItem('sg_'+k, JSON.stringify(v)); } catch(e) { console.warn('Storage full',e); } },
+  bilhetes: () => DB.g('bil') || [],
+  catalog:  () => DB.g('cat') || [],
+  zeros:    () => DB.g('z')   || [],
+  teams:    () => DB.g('teams') || {},   // { "Barcelona": 30, "Real Madrid": 12, ... }
+  leagues:  () => DB.g('leagues') || {},
+  saveBil:  v  => DB.s('bil',v),
+  saveCat:  v  => DB.s('cat',v),
+  saveZ:    v  => DB.s('z',v),
+  saveTeams:   v => DB.s('teams',v),
+  saveLeagues: v => DB.s('leagues',v),
 };
 
-function defaultData() {
-  return {
-    pontuacao: { exato: 2, vencedor: 1, erro: 0 },
-    participantes: [
-      { id: 1, nome: '👨‍🌾 Edervan' },
-      { id: 2, nome: '👽 Mano' },
-      { id: 3, nome: '☕ Rapha' },
-      { id: 4, nome: '👹 Renan' },
-      { id: 5, nome: '🍟 Rossoni' },
-      { id: 6, nome: '🏹 Huning' },
-      { id: 7, nome: '🐟 Bahiano' },
-      { id: 8, nome: '⚽ Boscatto' }
-    ],
-    jogos: [
-      {
-        id: 1, timeA: '🇲🇽 México', timeB: '🇿🇦 África do Sul', resultadoA: 2, resultadoB: 0,
-        palpites: {
-          1: { golsA: 3, golsB: 0, confirmado: true },
-          2: { golsA: 3, golsB: 1, confirmado: true },
-          3: { golsA: 2, golsB: 0, confirmado: true },
-          4: { golsA: 2, golsB: 0, confirmado: true },
-          5: { golsA: 2, golsB: 0, confirmado: true },
-          6: { golsA: 2, golsB: 0, confirmado: true },
-          7: { golsA: 2, golsB: 0, confirmado: true },
-          8: { golsA: 2, golsB: 0, confirmado: true }
-        }
-      },
-      {
-        id: 2, timeA: '🇰🇷 Coreia do Sul', timeB: '🇨🇿 República Tcheca', resultadoA: 2, resultadoB: 1,
-        palpites: {
-          1: { golsA: 1, golsB: 2, confirmado: true },
-          2: { golsA: 0, golsB: 2, confirmado: true },
-          3: { golsA: 1, golsB: 1, confirmado: true },
-          4: { golsA: 1, golsB: 0, confirmado: true },
-          5: { golsA: 1, golsB: 2, confirmado: true },
-          6: { golsA: 2, golsB: 0, confirmado: true },
-          7: { golsA: 1, golsB: 0, confirmado: true },
-          8: { golsA: 1, golsB: 2, confirmado: true }
-        }
-      },
-      { id: 3, timeA: '🇧🇷 Brasil', timeB: '🇲🇦 Marrocos', resultadoA: null, resultadoB: null, palpites: {} },
-      { id: 4, timeA: '🇨🇦 Canadá', timeB: '🇧🇦 Bósnia', resultadoA: null, resultadoB: null, palpites: {} },
-      { id: 5, timeA: '🇺🇸 Estados Unidos', timeB: '🇵🇾 Paraguai', resultadoA: null, resultadoB: null, palpites: {} }
-    ],
-    _nextId: 9,
-    _nextGameId: 6
+// ═══════════════════════════════════════════════
+// MEMÓRIA INTELIGENTE DE CLUBES E LIGAS
+// ═══════════════════════════════════════════════
+function learnTeam(name) {
+  if (!name) return;
+  name = name.trim();
+  if (!name) return;
+  const teams = DB.teams();
+  teams[name] = (teams[name] || 0) + 1;
+  DB.saveTeams(teams);
+}
+function learnLeague(name) {
+  if (!name) return;
+  name = name.trim();
+  if (!name) return;
+  const leagues = DB.leagues();
+  leagues[name] = (leagues[name] || 0) + 1;
+  DB.saveLeagues(leagues);
+}
+function refreshTeamList() {
+  const teams = DB.teams();
+  const sorted = Object.keys(teams).sort((a,b) => teams[b]-teams[a]);
+  const dl = document.getElementById('team-list');
+  if (dl) dl.innerHTML = sorted.map(t => '<option value="'+t.replace(/"/g,'&quot;')+'">').join('');
+}
+function refreshLeagueList() {
+  const leagues = DB.leagues();
+  const defaults = ['Copa do Mundo','Eliminatórias UEFA','Eliminatórias CONMEBOL','Champions League','Europa League','Conference League','Brasileirão Série A','Brasileirão Série B','Copa do Brasil','Libertadores','Sul-Americana','Premier League','La Liga','Serie A','Bundesliga','Ligue 1','Euro','Copa América','Nations League'];
+  const learned = Object.keys(leagues).sort((a,b) => leagues[b]-leagues[a]);
+  const merged = [...new Set([...learned, ...defaults])];
+  const dl = document.getElementById('league-list');
+  if (dl) dl.innerHTML = merged.map(l => '<option value="'+l.replace(/"/g,'&quot;')+'">').join('');
+}
+
+// ═══════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════
+function setTheme(t) {
+  document.documentElement.classList.toggle('light', t==='light');
+  localStorage.setItem('sg_theme', t);
+  document.getElementById('opt-dark').classList.toggle('active', t==='dark');
+  document.getElementById('opt-light').classList.toggle('active', t==='light');
+  closeSettings();
+}
+function toggleSettings(e) { e.stopPropagation(); document.getElementById('settingsMenu').classList.toggle('open'); }
+function closeSettings() { document.getElementById('settingsMenu').classList.remove('open'); }
+document.addEventListener('click', e => { if (!document.getElementById('settingsWrap')?.contains(e.target)) closeSettings(); });
+
+// ═══════════════════════════════════════════════
+// RESTORE TOOL — wipe all data
+// ═══════════════════════════════════════════════
+function confirmRestore() { closeSettings(); document.getElementById('restoreOverlay').classList.add('show'); }
+function closeRestoreModal() { document.getElementById('restoreOverlay').classList.remove('show'); }
+function restoreAll() {
+  ['sg_bil','sg_cat','sg_z','sg_theme'].forEach(k => localStorage.removeItem(k));
+  closeRestoreModal();
+  setTheme('dark');
+  updateBadges();
+  renderBilhetes(); renderCatalog(); renderZeroPanel();
+  resetForm();
+  goPageDirect('analyze');
+  toast('🗑 Ferramenta restaurada ao estado inicial');
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT DATA
+// ═══════════════════════════════════════════════
+function openExportModal() { closeSettings(); document.getElementById('exportOverlay').classList.add('show'); }
+function closeExportModal() { document.getElementById('exportOverlay').classList.remove('show'); }
+
+function buildExportPayload() {
+  const cat = DB.catalog(), bil = DB.bilhetes(), zeros = DB.zeros();
+  const stats = {
+    totalCatalogados: cat.length,
+    totalBilhetesPendentes: bil.length,
+    totalDestaques0x0: zeros.length,
+    green: cat.filter(e=>e.verdict?.cls==='green').length,
+    yellow: cat.filter(e=>e.verdict?.cls==='yellow').length,
+    orange: cat.filter(e=>e.verdict?.cls==='orange').length,
+    red: cat.filter(e=>e.verdict?.cls==='red').length,
   };
+  return { exportedAt: new Date().toISOString(), tool:'$cannerGol', version:'2.3', bilhetes: bil, catalogo: cat, destaques0x0: zeros, estatisticas: stats };
 }
 
-function cleanName(n) {
-  return n.replace(/\p{Emoji_Presentation}|\p{Emoji}\uFE0F/gu, '').trim();
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], {type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
-function getGameStatus(jogo) {
-  if (jogo.resultadoA !== null && jogo.resultadoB !== null) return 'finalizado';
-  const algumPalpite = Object.keys(jogo.palpites || {}).length > 0;
-  return algumPalpite ? 'aguardando' : 'futuro';
-}
-
-function calcPoints(palpiteA, palpiteB, resultadoA, resultadoB, pontuacao) {
-  if (resultadoA === null || resultadoB === null) return null;
-  if (palpiteA === resultadoA && palpiteB === resultadoB) return pontuacao.exato;
-  const sign = (a, b) => (a > b ? 1 : a < b ? -1 : 0);
-  if (sign(palpiteA, palpiteB) === sign(resultadoA, resultadoB)) return pontuacao.vencedor;
-  return pontuacao.erro;
-}
-
-export default function BolaoAliens() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('ranking');
-  const [gameTab, setGameTab] = useState('abertos');
-  const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState('total');
-  const [expandedGames, setExpandedGames] = useState({});
-  const [adminLoggedIn, setAdminLoggedIn] = useState(false);
-  const [pinInputs, setPinInputs] = useState(['', '', '', '']);
-  const [pinError, setPinError] = useState(false);
-  const [toasts, setToasts] = useState([]);
-  const [palpiteInputs, setPalpiteInputs] = useState({});
-  const [newGame, setNewGame] = useState({ timeA: '', timeB: '' });
-  const [newParticipant, setNewParticipant] = useState('');
-  const [resultInputs, setResultInputs] = useState({});
-  const [modalParticipant, setModalParticipant] = useState(null);
-  const [selectedRodada, setSelectedRodada] = useState(0);
-  const [rodadaMenuOpen, setRodadaMenuOpen] = useState(false);
-  const [stars] = useState(() =>
-    Array.from({ length: 80 }, () => ({
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 1.6 + 0.4,
-      opacity: Math.random() * 0.6 + 0.2
-    }))
-  );
-
-  const showToast = useCallback((msg, type = 'success') => {
-    const id = Date.now() + Math.random();
-    setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadData() {
-      try {
-        const result = await window.storage.get(STORAGE_KEY, true);
-        if (cancelled) return;
-        if (result && result.value) {
-          setData(JSON.parse(result.value));
-        } else {
-          const def = defaultData();
-          await window.storage.set(STORAGE_KEY, JSON.stringify(def), true);
-          if (!cancelled) setData(def);
-        }
-      } catch (e) {
-        if (!cancelled) setData(defaultData());
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    loadData();
-    const interval = setInterval(loadData, 4000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
-
-  const saveData = useCallback(async (newData) => {
-    setData(newData);
-    try {
-      await window.storage.set(STORAGE_KEY, JSON.stringify(newData), true);
-    } catch (e) {
-      showToast('⚠️ Erro ao salvar dados', 'error');
-    }
-  }, [showToast]);
-
-  function exportData() {
-    try {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const dateStr = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `bolao-aliens-backup-${dateStr}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('⬇️ Backup exportado com sucesso!', 'success');
-    } catch (e) {
-      showToast('⚠️ Erro ao exportar dados.', 'error');
-    }
-  }
-
-  function importData(event) {
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const parsed = JSON.parse(e.target.result);
-        if (!parsed || !Array.isArray(parsed.participantes) || !Array.isArray(parsed.jogos) || !parsed.pontuacao) {
-          showToast('⚠️ Arquivo inválido. Formato não reconhecido.', 'error');
-          return;
-        }
-        if (!window.confirm('Importar este arquivo vai SUBSTITUIR todos os dados atuais (participantes, jogos, palpites e resultados). Deseja continuar?')) {
-          return;
-        }
-        await saveData(parsed);
-        showToast('✅ Dados importados com sucesso!', 'success');
-      } catch (err) {
-        showToast('⚠️ Erro ao ler o arquivo. Verifique se é um JSON válido.', 'error');
-      } finally {
-        event.target.value = '';
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  if (loading || !data) {
-    return (
-      <div style={{
-        minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#050510', color: '#a855f7', fontFamily: 'Segoe UI, sans-serif', fontSize: '0.95rem'
-      }}>
-        👽 Carregando o bolão...
-      </div>
-    );
-  }
-
-  /* ============ CÁLCULOS ============ */
-  function getStatsForParticipant(pid) {
-    let total = 0, exatos = 0, vencedores = 0;
-    for (const jogo of data.jogos) {
-      const p = jogo.palpites[pid];
-      if (!p || !p.confirmado) continue;
-      const pts = calcPoints(p.golsA, p.golsB, jogo.resultadoA, jogo.resultadoB, data.pontuacao);
-      if (pts === null) continue;
-      total += pts;
-      if (pts === data.pontuacao.exato) exatos++;
-      else if (pts === data.pontuacao.vencedor) vencedores++;
-    }
-    return { total, exatos, vencedores };
-  }
-
-  function getSortedRanking() {
-    return data.participantes
-      .map(p => ({ ...p, ...getStatsForParticipant(p.id) }))
-      .sort((a, b) => {
-        let va, vb;
-        if (sortField === 'exatos') { va = a.exatos; vb = b.exatos; }
-        else if (sortField === 'vencedores') { va = a.vencedores; vb = b.vencedores; }
-        else { va = a.total; vb = b.total; }
-        if (vb !== va) return vb - va;
-        if (b.total !== a.total) return b.total - a.total;
-        return cleanName(a.nome).localeCompare(cleanName(b.nome), 'pt-BR');
-      });
-  }
-
-  const sortedRanking = getSortedRanking();
-  const filteredRanking = search.trim()
-    ? sortedRanking.filter(p => p.nome.toLowerCase().includes(search.trim().toLowerCase()) || cleanName(p.nome).toLowerCase().includes(search.trim().toLowerCase()))
-    : sortedRanking;
-
-  const jogosComStatus = data.jogos.map(j => ({ ...j, status: getGameStatus(j) }));
-  const jogosAbertos = jogosComStatus.filter(j => j.status !== 'finalizado');
-  const jogosFinalizados = jogosComStatus.filter(j => j.status === 'finalizado');
-
-  const searchLower = search.trim().toLowerCase();
-  const filterGame = (j) => {
-    if (!searchLower) return true;
-    return j.timeA.toLowerCase().includes(searchLower) || j.timeB.toLowerCase().includes(searchLower) ||
-      cleanName(j.timeA).toLowerCase().includes(searchLower) || cleanName(j.timeB).toLowerCase().includes(searchLower);
-  };
-
-  const counts = {
-    futuro: jogosComStatus.filter(j => j.status === 'futuro').length,
-    aguardando: jogosComStatus.filter(j => j.status === 'aguardando').length,
-    finalizado: jogosComStatus.filter(j => j.status === 'finalizado').length,
-    total: jogosComStatus.length
-  };
-
-  const totalExato = sortedRanking.reduce((s, p) => s + p.exatos, 0);
-  const totalPts = sortedRanking.reduce((s, p) => s + p.total, 0);
-
-  /* ============ AÇÕES ============ */
-  function toggleExpand(gameId) {
-    setExpandedGames(prev => ({ ...prev, [gameId]: !prev[gameId] }));
-  }
-
-  async function confirmPalpite(gameId, pid) {
-    const key = `${gameId}-${pid}`;
-    const input = palpiteInputs[key];
-    if (!input || input.golsA === '' || input.golsB === '' || input.golsA === undefined || input.golsB === undefined) {
-      showToast('⚠️ Preencha os dois campos do palpite.', 'error');
-      return;
-    }
-    const golsA = parseInt(input.golsA);
-    const golsB = parseInt(input.golsB);
-    if (isNaN(golsA) || isNaN(golsB) || golsA < 0 || golsB < 0) {
-      showToast('⚠️ Apenas números válidos.', 'error');
-      return;
-    }
-    const newData = JSON.parse(JSON.stringify(data));
-    const jogo = newData.jogos.find(j => j.id === gameId);
-    jogo.palpites[pid] = { golsA, golsB, confirmado: true };
-    await saveData(newData);
-    showToast('✅ Palpite confirmado!', 'success');
-  }
-
-  function setPalpiteInput(gameId, pid, field, value) {
-    const key = `${gameId}-${pid}`;
-    value = value.replace(/[^0-9]/g, '').slice(0, 2);
-    setPalpiteInputs(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
-  }
-
-  async function confirmResult(gameId) {
-    const r = resultInputs[gameId];
-    if (!r || r.golsA === '' || r.golsB === '' || r.golsA === undefined || r.golsB === undefined) {
-      showToast('⚠️ Preencha o resultado oficial.', 'error');
-      return;
-    }
-    const golsA = parseInt(r.golsA);
-    const golsB = parseInt(r.golsB);
-    if (isNaN(golsA) || isNaN(golsB) || golsA < 0 || golsB < 0) {
-      showToast('⚠️ Apenas números válidos.', 'error');
-      return;
-    }
-    const newData = JSON.parse(JSON.stringify(data));
-    const jogo = newData.jogos.find(j => j.id === gameId);
-    jogo.resultadoA = golsA;
-    jogo.resultadoB = golsB;
-    await saveData(newData);
-    showToast(`✅ Resultado ${golsA}x${golsB} confirmado!`, 'success');
-  }
-
-  async function clearResult(gameId) {
-    const newData = JSON.parse(JSON.stringify(data));
-    const jogo = newData.jogos.find(j => j.id === gameId);
-    jogo.resultadoA = null;
-    jogo.resultadoB = null;
-    await saveData(newData);
-    setResultInputs(prev => ({ ...prev, [gameId]: { golsA: '', golsB: '' } }));
-    showToast('↩ Resultado removido.', 'success');
-  }
-
-  function setResultInput(gameId, field, value) {
-    value = value.replace(/[^0-9]/g, '').slice(0, 2);
-    setResultInputs(prev => ({ ...prev, [gameId]: { ...prev[gameId], [field]: value } }));
-  }
-
-  async function addGame() {
-    if (!newGame.timeA.trim() || !newGame.timeB.trim()) {
-      showToast('⚠️ Preencha os dois times.', 'error');
-      return;
-    }
-    const newData = JSON.parse(JSON.stringify(data));
-    newData.jogos.push({
-      id: newData._nextGameId++,
-      timeA: newGame.timeA.trim(),
-      timeB: newGame.timeB.trim(),
-      resultadoA: null,
-      resultadoB: null,
-      palpites: {}
+function exportData(format) {
+  const payload = buildExportPayload();
+  const dateStr = new Date().toISOString().slice(0,10);
+  if (format === 'json') {
+    downloadFile('scannergol_backup_'+dateStr+'.json', JSON.stringify(payload, null, 2), 'application/json');
+  } else if (format === 'csv') {
+    const rows = [['Liga','Confronto','Data','HT','FT','Pontuação','Classificação']];
+    payload.catalogo.forEach(e => {
+      rows.push([e.league||'', e.match||'', e.ts||'', e.htScore||'', e.ftScore||'', (e.total+'/'+e.maxPts)||'', LABELS[e.verdict?.cls]||'']);
     });
-    await saveData(newData);
-    setNewGame({ timeA: '', timeB: '' });
-    showToast('✅ Jogo adicionado!', 'success');
+    const csv = rows.map(r => r.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+    downloadFile('scannergol_catalogo_'+dateStr+'.csv', csv, 'text/csv');
   }
+  closeExportModal();
+  toast('📤 Exportação concluída');
+}
 
-  async function removeGame(gameId) {
-    if (!window.confirm('Remover este jogo?')) return;
-    const newData = JSON.parse(JSON.stringify(data));
-    newData.jogos = newData.jogos.filter(j => j.id !== gameId);
-    await saveData(newData);
-    showToast('🗑️ Jogo removido.', 'success');
-  }
-
-  async function editGameTeams(gameId) {
-    const jogo = data.jogos.find(j => j.id === gameId);
-    if (!jogo) return;
-    const novoTimeA = window.prompt('Nome do Time A:', jogo.timeA);
-    if (novoTimeA === null) return;
-    const novoTimeB = window.prompt('Nome do Time B:', jogo.timeB);
-    if (novoTimeB === null) return;
-    if (!novoTimeA.trim() || !novoTimeB.trim()) {
-      showToast('⚠️ Os nomes não podem ficar vazios.', 'error');
-      return;
+// ═══════════════════════════════════════════════
+// IMPORT DATA
+// ═══════════════════════════════════════════════
+function handleImportFile(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || (!data.bilhetes && !data.catalogo && !data.destaques0x0)) {
+        toast('⚠️ Arquivo inválido — selecione um backup do $cannerGol'); return;
+      }
+      if (!confirm('Importar este backup? Os dados serão somados ao histórico atual.')) return;
+      if (Array.isArray(data.bilhetes))     DB.saveBil([...data.bilhetes, ...DB.bilhetes()]);
+      if (Array.isArray(data.catalogo))     DB.saveCat([...data.catalogo, ...DB.catalog()]);
+      if (Array.isArray(data.destaques0x0)) DB.saveZ([...data.destaques0x0, ...DB.zeros()]);
+      updateBadges(); renderBilhetes(); renderCatalog(); renderZeroPanel();
+      closeSettings();
+      toast('📥 Backup importado com sucesso');
+    } catch(err) {
+      toast('⚠️ Não foi possível ler o arquivo de backup');
     }
-    const newData = JSON.parse(JSON.stringify(data));
-    const j = newData.jogos.find(x => x.id === gameId);
-    j.timeA = novoTimeA.trim();
-    j.timeB = novoTimeB.trim();
-    await saveData(newData);
-    showToast('✅ Confronto atualizado!', 'success');
-  }
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
+}
 
-  async function addParticipant() {
-    if (!newParticipant.trim()) {
-      showToast('⚠️ Digite um nome.', 'error');
-      return;
+// ═══════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════
+const ICONS  = { green:'🟢', yellow:'🟡', orange:'🟠', red:'🔴' };
+const COLORS = { green:'#00C853', yellow:'#FFD600', orange:'#FF6B35', red:'#F23557' };
+const LABELS = { green:'+1.5G', yellow:'+0.5G', orange:'Aguardar', red:'FORA' };
+const CLS_DIM    = { green:'rgba(0,200,83,0.12)',   yellow:'rgba(255,214,0,0.12)',   orange:'rgba(255,107,53,0.12)',   red:'rgba(242,53,87,0.12)' };
+const CLS_BORDER = { green:'rgba(0,200,83,0.3)',    yellow:'rgba(255,214,0,0.3)',    orange:'rgba(255,107,53,0.3)',    red:'rgba(242,53,87,0.3)' };
+
+const BASIC_SCORES = ['0x0','1x0','0x1','1x1','2x0','0x2'];
+const ADV_SCORES   = ['2x1','1x2','2x2','3x0','0x3','3x1','1x3','3x2','4x0','0x4','4x1','1x4'];
+const SCORE_PH     = {'0x0':'18.00','1x0':'9.00','0x1':'11.00','1x1':'8.50','2x0':'7.00','0x2':'10.00'};
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let currentResult = null;
+let currentReport = null; // fix #7: save full report
+let _filter='all', _league='';
+const cardOn = { res:true, ou:true, btts:true, pc:true };
+const cardOpen = { res:true, ou:true, btts:true, pc:true };
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+function init() {
+  const t = localStorage.getItem('sg_theme') || 'dark';
+  document.documentElement.classList.toggle('light', t==='light');
+  document.getElementById('opt-dark').classList.toggle('active', t==='dark');
+  document.getElementById('opt-light').classList.toggle('active', t==='light');
+  buildScoreRows();
+  updateBadges();
+  renderBilhetes();
+  renderCatalog();
+  renderZeroPanel();
+  refreshTeamList();
+  refreshLeagueList();
+}
+
+function buildScoreRows() {
+  BASIC_SCORES.forEach(s => document.getElementById('basicScores').appendChild(makeScoreRow(s)));
+  ADV_SCORES.forEach(s => document.getElementById('advScoreRows').appendChild(makeScoreRow(s)));
+}
+
+function makeScoreRow(score) {
+  const ph = SCORE_PH[score] || '';
+  const row = document.createElement('div');
+  row.className = 'score-row';
+  row.innerHTML = `
+    <div class="score-lbl" id="lbl-${score}">${score}</div>
+    <input type="text" id="sc-${score}" placeholder="${ph}" inputmode="numeric"
+      oninput="autoOdd(this);updateScoreRanks();" onblur="finalizeOdd(this);updateScoreRanks();">
+    <div class="score-rank" id="rank-${score}"></div>`;
+  return row;
+}
+
+// ═══════════════════════════════════════════════
+// fix #2: auto-format — placeholders already formatted, digits only input
+// ═══════════════════════════════════════════════
+function autoOdd(el) {
+  const raw = el.value.replace(/[^\d]/g,'');
+  if (!raw) { el.value=''; return; }
+  if (raw.length >= 3) {
+    el.value = raw.slice(0, raw.length-2) + '.' + raw.slice(-2);
+  } else {
+    el.value = raw;
+  }
+  checkDots();
+}
+function finalizeOdd(el) {
+  const raw = el.value.replace(/[^\d]/g,'');
+  if (!raw || raw.length < 3) return;
+  el.value = raw.slice(0, raw.length-2) + '.' + raw.slice(-2);
+}
+
+function parseOdd(id) { const el=document.getElementById(id); return el?(parseFloat(el.value)||null):null; }
+function parseScoreOdd(s) { const el=document.getElementById('sc-'+s); return el?(parseFloat(el.value)||null):null; }
+
+// ═══════════════════════════════════════════════
+// ODD STEPPER [+ / -] — quick adjust by 0.01
+// ═══════════════════════════════════════════════
+function stepOdd(id, dir) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let v = parseFloat(el.value) || 1.00;
+  v = Math.round((v + dir*0.01) * 100) / 100;
+  if (v < 1.01) v = 1.01;
+  if (v > 999) v = 999;
+  el.value = v.toFixed(2);
+  el.classList.add('has-val');
+  checkDots();
+  if (typeof updateProgress === 'function') updateProgress();
+}
+
+// ═══════════════════════════════════════════════
+// LIVE SCORE RANKS
+// ═══════════════════════════════════════════════
+function updateScoreRanks() {
+  const all = [...BASIC_SCORES,...ADV_SCORES];
+  const filled = all.map(s=>({s,v:parseScoreOdd(s)})).filter(x=>x.v!==null);
+  filled.sort((a,b)=>a.v-b.v);
+  all.forEach(s=>{
+    const lbl=document.getElementById('lbl-'+s); const rank=document.getElementById('rank-'+s);
+    if(lbl) lbl.classList.remove('danger','top'); if(rank) rank.textContent='';
+  });
+  filled.forEach((item,i)=>{
+    const lbl=document.getElementById('lbl-'+item.s); const rank=document.getElementById('rank-'+item.s);
+    if(rank) rank.textContent='#'+(i+1);
+    if(lbl) { if(item.s==='0x0'&&i<5) lbl.classList.add('danger'); else if(i<5) lbl.classList.add('top'); }
+  });
+  checkDots();
+}
+
+// ═══════════════════════════════════════════════
+// fix #8: progress dots + FAB
+// ═══════════════════════════════════════════════
+function checkDots() {
+  const idOk = !!(document.getElementById('f-league').value.trim() &&
+                  document.getElementById('f-teamA').value.trim() &&
+                  document.getElementById('f-teamB').value.trim());
+  setDot('id', idOk);
+  const resOk = !cardOn.res || (!!parseOdd('f-oddA') && !!parseOdd('f-oddB'));
+  const ouOk  = !cardOn.ou  || (!!parseOdd('f-over') && !!parseOdd('f-under'));
+  const bttsOk= !cardOn.btts|| (!!parseOdd('f-sim')  && !!parseOdd('f-nao'));
+  const pcOk  = !cardOn.pc  || [...BASIC_SCORES,...ADV_SCORES].some(s=>parseScoreOdd(s)!==null);
+  if(cardOn.res)  setDot('res',  !!parseOdd('f-oddA') && !!parseOdd('f-oddB'));
+  if(cardOn.ou)   setDot('ou',   !!parseOdd('f-over') && !!parseOdd('f-under'));
+  if(cardOn.btts) setDot('btts', !!parseOdd('f-sim')  && !!parseOdd('f-nao'));
+  if(cardOn.pc)   setDot('pc',   [...BASIC_SCORES,...ADV_SCORES].some(s=>parseScoreOdd(s)!==null));
+  // progress bar
+  const total=4, done=[resOk,ouOk,bttsOk,pcOk].filter(Boolean).length;
+  document.getElementById('progressFill').style.width=(idOk?(done/total*100):0)+'%';
+  // FAB visibility
+  const anyFilled = resOk||ouOk||bttsOk||pcOk;
+  document.getElementById('fab').classList.toggle('visible', idOk && anyFilled);
+}
+function setDot(id,filled){ const d=document.getElementById('dot-'+id); if(d) d.classList.toggle('filled',!!filled); }
+
+// ═══════════════════════════════════════════════
+// fix #1: toggle vs expand (separate actions)
+// ═══════════════════════════════════════════════
+function expandCard(id) {
+  if (!cardOn[id]) return; // if disabled, do nothing
+  cardOpen[id] = !cardOpen[id];
+  document.getElementById('body-'+id).classList.toggle('collapsed', !cardOpen[id]);
+}
+function toggleCard(id) {
+  cardOn[id] = !cardOn[id];
+  document.getElementById('tog-'+id).classList.toggle('on', cardOn[id]);
+  document.getElementById('mc-'+id).classList.toggle('disabled', !cardOn[id]);
+  if (!cardOn[id]) {
+    document.getElementById('body-'+id).classList.add('collapsed');
+    setDot(id, false);
+  } else {
+    document.getElementById('body-'+id).classList.remove('collapsed');
+    cardOpen[id] = true;
+  }
+  checkDots();
+}
+function toggleAdv() {
+  const rows=document.getElementById('advScores');
+  const isOpen=rows.classList.toggle('show');
+  document.getElementById('advArrow').textContent=isOpen?'▴':'▾';
+  document.getElementById('advBtn').childNodes[0].textContent=isOpen?'☑ Ocultar placares avançados ':'☑ Mais opções de placar ';
+}
+
+// ═══════════════════════════════════════════════
+// PAINEL DE PONTUAÇÃO RETRÁTIL
+// ═══════════════════════════════════════════════
+let _scorePanelCollapsed = false;
+function toggleScorePanel() {
+  _scorePanelCollapsed = !_scorePanelCollapsed;
+  applyScorePanelState();
+}
+function applyScorePanelState() {
+  const panel = document.getElementById('scorePanel');
+  const banner = document.getElementById('opBanner');
+  const label = document.getElementById('collapseScoreLabel');
+  if (!panel) return;
+  panel.style.display = _scorePanelCollapsed ? 'none' : 'block';
+  if (banner) banner.style.display = _scorePanelCollapsed ? 'none' : 'flex';
+  if (label) label.textContent = _scorePanelCollapsed ? 'Exibir' : 'Recolher';
+}
+
+// ═══════════════════════════════════════════════
+// SCORING ENGINE — fix #3: empate used, fix #4: BTTS clarified
+// ═══════════════════════════════════════════════
+const V = {
+  // fix #3: use empate to find zebra more accurately (if empate is odd, team odds clarify who's fav)
+  result: (a, draw, b) => {
+    const fav = Math.min(a, b);
+    const zeb = Math.max(a, b);
+    if (fav<1.60 && zeb>5.00) return {s:'green', pts:2, detail:`Fav ${fav} / Zebra ${zeb}`};
+    if ((fav>=1.60&&fav<=2.00)||(zeb>=4.00&&zeb<=5.00)) return {s:'yellow',pts:1,detail:`Fav ${fav} / Zebra ${zeb}`};
+    return {s:'red',pts:0,detail:`Fav ${fav} / Zebra ${zeb}`};
+  },
+  over25: (over,under) => {
+    if (over<1.70) return {s:'green',pts:2,detail:`Mais 2.5 → ${over}`};
+    if (over>=1.70&&over<=2.10) return {s:'yellow',pts:1,detail:`Mais 2.5 → ${over}`};
+    if (under<1.70) return {s:'red',pts:0,detail:`Menos 2.5 favorito (${under})`};
+    return {s:'yellow',pts:1,detail:`Mais 2.5 → ${over}`};
+  },
+  // fix #4: BTTS — SIM menor = mais barato = mercado ESPERA ambas marcarem = verde
+  btts: (sim, nao) => {
+    const d = Math.abs(sim-nao);
+    if (sim < nao) return {s:'green', pts:2, detail:`SIM ${sim} < NÃO ${nao} — mercado espera ambas marcarem`};
+    if (d < 0.20)  return {s:'yellow',pts:1, detail:`Mercado equilibrado (Δ ${d.toFixed(2)})`};
+    return {s:'red',pts:0,detail:`NÃO ${nao} < SIM ${sim} — mercado não espera ambas marcarem`};
+  },
+  // fix #5: require min 3 scores
+  correctScore: () => {
+    const all=[...BASIC_SCORES,...ADV_SCORES];
+    const filled=all.map(s=>({s,v:parseScoreOdd(s)})).filter(x=>x.v!==null);
+    if (filled.length < 3) return {s:'yellow',pts:1,detail:`Poucos placares (${filled.length}/3 min)`,warn:true};
+    filled.sort((a,b)=>a.v-b.v);
+    const top5=filled.slice(0,5).map(x=>x.s);
+    const GREEN=['2x0','2x1','1x2','2x2','3x0'];
+    const YELLOW=['1x0','0x1','1x1'];
+    if (top5.includes('0x0')) return {s:'red',pts:0,detail:`0x0 protegido — ${top5.join(', ')}`};
+    if (top5.some(s=>GREEN.includes(s))) return {s:'green',pts:2,detail:top5.join(', ')};
+    if (top5.some(s=>YELLOW.includes(s))) return {s:'yellow',pts:1,detail:top5.join(', ')};
+    return {s:'yellow',pts:1,detail:top5.join(', ')};
+  }
+};
+
+// ═══════════════════════════════════════════════
+// SISTEMA DE PESO POR COMPETIÇÃO
+// ═══════════════════════════════════════════════
+const LEAGUE_PROFILES = {
+  over: {
+    leagues: ['copa do mundo','mls','bundesliga','eredivisie','champions league'],
+    adjust: 1,
+    label: 'OVER',
+    icon: '🔥',
+    desc: 'Competição historicamente favorável para mercados de gols.'
+  },
+  under: {
+    leagues: ['liga argentina','série b brasil','serie b brasil','uruguai','paraguai'],
+    adjust: -1,
+    label: 'UNDER',
+    icon: '🧱',
+    desc: 'Competição historicamente mais fechada. Exige pontuação superior para recomendações de entrada.'
+  },
+  neutral: {
+    leagues: ['premier league','la liga','série a brasil','serie a brasil'],
+    adjust: 0,
+    label: 'NEUTRA',
+    icon: '⚖️',
+    desc: 'Sem padrão histórico de viés ofensivo ou defensivo identificado.'
+  }
+};
+
+function getLeagueProfile(league) {
+  if (!league) return null;
+  const norm = league.trim().toLowerCase();
+  for (const key of ['over','under','neutral']) {
+    const profile = LEAGUE_PROFILES[key];
+    if (profile.leagues.some(l => norm.includes(l) || l.includes(norm))) {
+      return { key, league: league.trim(), ...profile };
     }
-    const newData = JSON.parse(JSON.stringify(data));
-    newData.participantes.push({ id: newData._nextId++, nome: newParticipant.trim() });
-    await saveData(newData);
-    setNewParticipant('');
-    showToast('✅ Participante adicionado!', 'success');
+  }
+  return null; // liga não mapeada — sem ajuste
+}
+
+function getVerdict(total,max) {
+  const p=total/(max||12);
+  if(p>=0.75) return {cls:'green'};
+  if(p>=0.42) return {cls:'yellow'};
+  if(p>=0.25) return {cls:'orange'};
+  return {cls:'red'};
+}
+
+// ═══════════════════════════════════════════════
+// FAVORITISMO INTENSITY
+// ═══════════════════════════════════════════════
+function getFavoritismo(oddA, oddB) {
+  if (!oddA || !oddB) return null;
+  const fav = Math.min(oddA, oddB);
+  const zeb = Math.max(oddA, oddB);
+
+  // 🟣 Hiper Favorito — Favorito abaixo de 1.19 / Zebra acima de 11.10
+  if (fav < 1.19 || zeb >= 11.10) {
+    return { level:'hiper', label:'Hiper Favorito', icon:'🟣', color:'#9C27B0',
+             dim:'rgba(156,39,176,0.1)', border:'rgba(156,39,176,0.3)',
+             desc:'Domínio extremo — mercado praticamente descarta surpresa',
+             scenarios:['3x0','4x0','5x0'] };
+  }
+  // 🔵 Super Favorito — Favorito 1.20–1.39 / Zebra 8.10–11.09
+  if ((fav>=1.20&&fav<=1.39) || (zeb>=8.10&&zeb<=11.09)) {
+    return { level:'super', label:'Super Favorito', icon:'🔵', color:'#2196F3',
+             dim:'rgba(33,150,243,0.1)', border:'rgba(33,150,243,0.3)',
+             desc:'Domínio claro esperado — alta expectativa ofensiva',
+             scenarios:['2x0','3x0','3x1'] };
+  }
+  // 🟢 Favorito — Favorito 1.40–1.69 / Zebra 5.10–8.09
+  if ((fav>=1.40&&fav<=1.69) || (zeb>=5.10&&zeb<=8.09)) {
+    return { level:'fav', label:'Favorito', icon:'🟢', color:'#00C853',
+             dim:'rgba(0,200,83,0.1)', border:'rgba(0,200,83,0.3)',
+             desc:'Mercado espera superioridade — possibilidade moderada para gols',
+             scenarios:['1x0','2x0','2x1'] };
+  }
+  return null; // equilibrado — sem classificação de favoritismo
+}
+
+// ═══════════════════════════════════════════════
+// OPERATIONAL REPORT
+// ═══════════════════════════════════════════════
+function buildOperationalReport(scores, total, maxPts, favObj, leagueProfile) {
+  const verdict=getVerdict(total,maxPts);
+  const {r,o,b,c}=scores;
+  const readings=[];
+
+  if(r) {
+    if(favObj&&favObj.level==='hiper') readings.push({ok:true, text:'🟣 Hiper Favorito — domínio extremo, favorito cumpre a linha sozinho'});
+    else if(favObj&&favObj.level==='super') readings.push({ok:true, text:'🔵 Super Favorito — domínio claro, alta expectativa ofensiva'});
+    else if(r.s==='green')   readings.push({ok:true,  text:'🟢 Favorito — superioridade esperada, possibilidade moderada de gols'});
+    else if(r.s==='yellow') readings.push({ok:'warn', text:'Jogo equilibrado — favorito sem domínio total'});
+    else                readings.push({ok:false, text:'Mercado aberto — sem tendência de resultado'});
+  }
+  if(o) {
+    if(o.s==='green')   readings.push({ok:true,  text:'Mercado espera jogo com gols (Over 2.5 protegido)'});
+    else if(o.s==='yellow') readings.push({ok:'warn',text:'Tendência moderada para gols'});
+    else                readings.push({ok:false, text:'Mercado aposta em jogo fechado (Under favorito)'});
+  }
+  if(b) {
+    // fix #4 reflected in reading text
+    if(b.s==='green')   readings.push({ok:true,  text:'Mercado espera participação ofensiva de ambos os times'});
+    else if(b.s==='yellow') readings.push({ok:'warn',text:'Ambas marcam não é tendência clara'});
+    else                readings.push({ok:false, text:'Mercado não espera ambas as equipes marcarem'});
+  }
+  if(c) {
+    if(c.warn)          readings.push({ok:'warn', text:`Placar Exato com poucos dados — ${c.detail}`});
+    else if(c.s==='green')  readings.push({ok:true,  text:'Placares com gols dominam — 0x0 pouco protegido'});
+    else if(c.s==='yellow') readings.push({ok:'warn',text:'Placares de baixo volume lideram (1x0 / 1x1)'});
+    else                readings.push({ok:false, text:'0x0 entre os placares mais protegidos do mercado'});
   }
 
-  async function removeParticipant(pid) {
-    const p = data.participantes.find(x => x.id === pid);
-    if (!window.confirm(`Remover "${p.nome}"?`)) return;
-    const newData = JSON.parse(JSON.stringify(data));
-    newData.participantes = newData.participantes.filter(x => x.id !== pid);
-    newData.jogos.forEach(j => { delete j.palpites[pid]; });
-    await saveData(newData);
-    showToast(`🗑️ ${p.nome} removido.`, 'success');
+  // scenarios — from filled correct-score odds, or fallback to favoritismo-level typical scores
+  const all=[...BASIC_SCORES,...ADV_SCORES];
+  const filled=all.map(s=>({s,v:parseScoreOdd(s)})).filter(x=>x.v!==null);
+  filled.sort((a,b)=>a.v-b.v);
+  const top5=filled.slice(0,5).map(x=>x.s);
+  let goalsScen=top5.filter(s=>s!=='0x0'&&s!=='1x1');
+  const hasZeroZero=top5.includes('0x0');
+  let scenFromFavoritismo=false;
+  if (!goalsScen.length && favObj && favObj.scenarios) {
+    goalsScen = favObj.scenarios;
+    scenFromFavoritismo = true;
   }
 
-  function checkPin() {
-    const pin = pinInputs.join('');
-    if (pin === ADMIN_PIN) {
-      setAdminLoggedIn(true);
-      setPinError(false);
+  // adjustments
+  const adjs=[];
+  if(r&&r.s!=='green') {
+    const oddA=parseOdd('f-oddA')||99, oddB=parseOdd('f-oddB')||99;
+    const fav=Math.min(oddA,oddB), zeb=Math.max(oddA,oddB);
+    if(fav>=1.60) adjs.push({market:'Favorito',val:fav,ideal:'abaixo de 1.60',dir:'down',msg:'Aguardar queda da odd do favorito'});
+    if(zeb<=5.00) adjs.push({market:'Zebra',val:zeb,ideal:'acima de 5.00',dir:'up',msg:'Aguardar aumento da odd da zebra'});
+  }
+  if(o&&o.s!=='green') {
+    const over=parseOdd('f-over');
+    if(over&&over>=1.70) adjs.push({market:'Mais de 2.5',val:over,ideal:'abaixo de 1.70',dir:'down',msg:'Aguardar queda da odd do Mais 2.5'});
+  }
+  if(b&&b.s==='red') {
+    const nao=parseOdd('f-nao'),sim=parseOdd('f-sim');
+    if(nao&&sim&&nao<sim) adjs.push({market:'Ambas Marcam',val:`SIM ${sim}`,ideal:'SIM menor que NÃO',dir:'down',msg:'Aguardar queda da odd do SIM'});
+  }
+
+  // classify — favoritismo can elevate yellow→green or orange→yellow
+  let cls,label,stake,market,plan,planDetail;
+  let effectiveVerdict = verdict.cls;
+  if(favObj&&(favObj.level==='hiper'||favObj.level==='super')) {
+    if(verdict.cls==='yellow') effectiveVerdict='green';   // super/hiper lifts yellow to green
+    if(verdict.cls==='orange') effectiveVerdict='yellow';  // super/hiper lifts orange to yellow
+  }
+
+  // nova lógica: perfil OVER + pontuação na faixa 5-6/12 (~orange limítrofe) → eleva para entrada conservadora
+  let leagueLifted = false;
+  if (effectiveVerdict==='orange' && leagueProfile && leagueProfile.key==='over') {
+    const normalizedScore = maxPts>0 ? (total/maxPts)*12 : 0; // normaliza para escala de 12 pts
+    if (normalizedScore >= 5 && normalizedScore <= 6) {
+      effectiveVerdict = 'yellow';
+      leagueLifted = true;
+    }
+  }
+
+  if(effectiveVerdict==='green') {
+    cls='green';label='Entrada Favorável para +1.5';stake='Moderada';market='Mais de 1.5 Gols';
+    plan='Monitorar início da partida.';
+    if(favObj&&favObj.level==='hiper')
+      planDetail='Hiper Favorito identificado — favorito tem potencial de cumprir a linha sozinho. Aguardar os primeiros 5–10 min. Atenção ao placar 0x0 como ponto de entrada em ao vivo.';
+    else if(favObj&&favObj.level==='super')
+      planDetail='Super Favorito identificado — domínio claro esperado. Aguardar os primeiros 10–15 min para confirmar intensidade. Favorito deve criar pressão constante.';
+    else
+      planDetail='Aguardar os primeiros 10–15 min para confirmar pressão ofensiva. Se o jogo iniciar sem intensidade, aguardar o primeiro ataque perigoso antes de operar.';
+  } else if(effectiveVerdict==='yellow') {
+    cls='yellow';label='Entrada Favorável para +0.5';stake='Conservadora';market='Mais de 0.5 Gol';
+    plan='Aguardar início e monitorar.';
+    if(leagueLifted)
+      planDetail='Pontuação na zona de ajuste, porém a competição '+leagueProfile.league+' possui perfil OVER — historicamente favorável para mercados de gols. Isso eleva a confiança para uma entrada conservadora em +0.5 Gol. Observar os primeiros minutos antes de operar.';
+    else if(favObj&&(favObj.level==='hiper'||favObj.level==='super'))
+      planDetail='Favoritismo forte compensa alguns critérios desfavoráveis. Observe os primeiros minutos — se o favorito pressionar, considere entrada em +0.5 Gol.';
+    else
+      planDetail='Entrada apenas mediante confirmação visual. Observar intensidade ofensiva nos primeiros minutos. Não operar se o jogo parecer travado.';
+  } else if(effectiveVerdict==='orange') {
+    cls='orange';label='Aguardar Ajuste de Mercado';stake='—';market='—';
+    plan='Mercado próximo do padrão, sem confirmação.';
+    planDetail='Acompanhe a movimentação das odds. Quando os critérios indicados melhorarem, reavalie a entrada.';
+  } else {
+    cls='red';label='Não Recomendado';stake='—';market='—';
+    plan='Jogo fora do padrão GOL$ NA COPA.';
+    planDetail='Os critérios abaixo precisam melhorar antes de considerar qualquer operação.';
+  }
+
+  return {cls,label,stake,market,plan,planDetail,readings,adjs,goalsScen,hasZeroZero,scenFromFavoritismo,leagueProfile,leagueLifted};
+}
+
+// ═══════════════════════════════════════════════
+// RUN ANALYSIS
+// ═══════════════════════════════════════════════
+function runAnalysis() {
+  if(cardOn.res  && (!parseOdd('f-oddA')||!parseOdd('f-oddB'))) { toast('⚠️ Preencha as odds do Resultado da Partida'); return; }
+  if(cardOn.ou   && (!parseOdd('f-over')||!parseOdd('f-under'))) { toast('⚠️ Preencha as odds de Mais/Menos 2.5'); return; }
+  if(cardOn.btts && (!parseOdd('f-sim')||!parseOdd('f-nao')))   { toast('⚠️ Preencha as odds de Ambas Marcam'); return; }
+
+  const league=document.getElementById('f-league').value.trim();
+  const teamA=document.getElementById('f-teamA').value.trim()||'Time A';
+  const teamB=document.getElementById('f-teamB').value.trim()||'Time B';
+  const match=`${teamA} x ${teamB}`;
+
+  // memória inteligente — aprende clubes e ligas usados
+  learnTeam(teamA); learnTeam(teamB); learnLeague(league);
+  refreshTeamList(); refreshLeagueList();
+
+  showLoading('Calculando pontuação...');
+  setTimeout(()=>{
+    const empate=parseOdd('f-empate');
+    const r=cardOn.res  ? V.result(parseOdd('f-oddA'), empate, parseOdd('f-oddB')) : null;
+    const o=cardOn.ou   ? V.over25(parseOdd('f-over'), parseOdd('f-under'))         : null;
+    const b=cardOn.btts ? V.btts(parseOdd('f-sim'), parseOdd('f-nao'))              : null;
+    const c=cardOn.pc   ? V.correctScore()                                            : null;
+    const maxPts=(cardOn.res?2:0)+(cardOn.ou?4:0)+(cardOn.btts?2:0)+((cardOn.pc&&c&&!c.warn)?4:0);
+    let total=(r?r.pts*1:0)+(o?o.pts*2:0)+(b?b.pts*1:0)+(c&&!c.warn?c.pts*2:0);
+
+    // sistema de peso por competição — ajusta pontos de confiança
+    const leagueProfile = getLeagueProfile(league);
+    if (leagueProfile) total = Math.max(0, Math.min(maxPts, total + leagueProfile.adjust));
+
+    hideLoading();
+    showResult(match,league,{r,o,b,c},total,maxPts,leagueProfile);
+  },600);
+}
+
+// ═══════════════════════════════════════════════
+// SHOW RESULT
+// ═══════════════════════════════════════════════
+function showResult(match,league,scores,total,maxPts,leagueProfile){
+  const verdict=getVerdict(total,maxPts);
+  const oddA=parseOdd('f-oddA'), oddB=parseOdd('f-oddB');
+  const favObj=getFavoritismo(oddA,oddB);
+  const report=buildOperationalReport(scores,total,maxPts,favObj,leagueProfile);
+  // fix #7: store full report for bilhete
+  currentReport=report;
+  const now=new Date();
+  const ts=now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+
+  document.getElementById('r-league').textContent=league||'—';
+  // favoritismo badge
+  const favBadgeEl = document.getElementById('r-fav-badge');
+  if(favBadgeEl) {
+    if(favObj) {
+      favBadgeEl.innerHTML=favObj.icon+' '+favObj.label;
+      favBadgeEl.style.cssText='display:inline-flex;align-items:center;gap:5px;margin-top:4px;padding:3px 10px;border-radius:20px;font-family:var(--fm);font-size:10px;font-weight:600;letter-spacing:.5px;background:'+favObj.dim+';border:1px solid '+favObj.border+';color:'+favObj.color;
     } else {
-      setPinError(true);
-      setPinInputs(['', '', '', '']);
-      setTimeout(() => setPinError(false), 2500);
+      favBadgeEl.innerHTML=''; favBadgeEl.style.display='none';
     }
   }
+  document.getElementById('r-match').textContent=match;
+  document.getElementById('r-ts').textContent=ts;
 
-  function handlePinInput(idx, value) {
-    value = value.replace(/[^0-9]/g, '').slice(0, 1);
-    const next = [...pinInputs];
-    next[idx] = value;
-    setPinInputs(next);
-    if (value && idx < 3) {
-      const el = document.getElementById(`pin-${idx + 1}`);
-      if (el) el.focus();
-    }
+  const mList=[
+    {label:'Resultado',data:scores.r,w:1},{label:'Mais/Menos 2.5',data:scores.o,w:2},
+    {label:'Ambas Marcam',data:scores.b,w:1},{label:'Placar Exato',data:scores.c,w:2},
+  ].filter(m=>m.data);
+
+  document.getElementById('metricsRow').innerHTML=mList.map(m=>`
+    <div class="metric-card">
+      <div class="metric-label">${m.label}</div>
+      <div class="metric-status">${ICONS[m.data.s]}</div>
+      <div class="metric-pts">${m.data.pts*m.w} pts ×${m.w}</div>
+      <div class="metric-detail">${m.data.detail}</div>
+    </div>`).join('');
+
+  const pct=maxPts>0?(total/maxPts)*100:0;
+  document.getElementById('scoreNum').textContent=`${total}/${maxPts}`;
+  document.getElementById('barMax').textContent=maxPts;
+  document.getElementById('barFill').style.background=COLORS[verdict.cls];
+  document.getElementById('barFill').style.width='0%';
+  setTimeout(()=>document.getElementById('barFill').style.width=pct+'%',80);
+
+  const gs=mList.filter(m=>m.data.s==='green').length;
+  const ys=mList.filter(m=>m.data.s==='yellow').length;
+  const rs=mList.filter(m=>m.data.s==='red').length;
+  document.getElementById('scorePills').innerHTML=`
+    <span class="pill pill-g">🟢 ${gs}</span>
+    <span class="pill pill-y">🟡 ${ys}</span>
+    <span class="pill pill-r">🔴 ${rs}</span>`;
+
+  const clr=COLORS[report.cls], dim=CLS_DIM[report.cls], brd=CLS_BORDER[report.cls], emj=ICONS[report.cls];
+  const readHtml=report.readings.map(r=>`<div class="op-reading-row"><span class="op-read-icon">${r.ok===true?'✅':r.ok==='warn'?'⚠️':'❌'}</span><span>${r.text}</span></div>`).join('');
+  let scenHtml='';
+  if(report.goalsScen.length&&(report.cls==='green'||report.cls==='yellow')) {
+    const scenLabel = report.scenFromFavoritismo ? 'Cenários esperados (baseado no favoritismo)' : 'Cenários esperados';
+    scenHtml=`<div class="op-subblock"><div class="op-subblock-label">${scenLabel}</div><div class="op-scenarios">${report.goalsScen.slice(0,4).map(s=>`<div class="op-scenario-chip">${s}</div>`).join('')}</div></div>`;
+  }
+  if(report.hasZeroZero) scenHtml+=`<div class="op-scenario-warn">⚠️ 0x0 entre os placares protegidos — atenção redobrada</div>`;
+
+  let adjHtml='';
+  if(report.adjs.length) {
+    adjHtml=`<div class="op-block op-adj-block"><div class="op-block-title">🚨 Ajustes Necessários</div>${report.adjs.map(a=>`<div class="op-adj-item"><div class="op-adj-market">${a.market}</div><div class="op-adj-row"><span class="op-adj-val">${a.val}</span><span class="op-adj-arrow">${a.dir==='down'?'⬇️':'⬆️'}</span><span class="op-adj-ideal">Ideal: ${a.ideal}</span></div><div class="op-adj-msg">${a.msg}</div></div>`).join('<div class="op-adj-sep"></div>')}</div>`;
   }
 
-  /* ============ STYLES ============ */
-  const colors = {
-    bgSpace: '#050510', bgCard: '#0d0d2b', purple: '#a855f7', blue: '#3b82f6',
-    green: '#22c55e', cyan: '#06b6d4', red: '#ef4444', gold: '#fbbf24',
-    silver: '#94a3b8', bronze: '#cd7c2f', textPrimary: '#e2e8f0',
-    textSecondary: '#94a3b8', textMuted: '#475569', border: 'rgba(168,85,247,0.2)',
-    borderGlow: 'rgba(168,85,247,0.5)'
-  };
+  let stakeHtml='';
+  if(report.cls==='green'||report.cls==='yellow') {
+    stakeHtml=`<div class="op-stake-row"><div class="op-stake-item"><div class="op-stake-label">Stake</div><div class="op-stake-val">${report.stake}</div></div><div class="op-stake-divider"></div><div class="op-stake-item"><div class="op-stake-label">Mercado</div><div class="op-stake-val" style="color:${clr}">${report.market}</div></div></div>`;
+  }
 
-  const cardStyle = {
-    background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '12px'
-  };
+  let contextHtml='';
+  if (leagueProfile) {
+    const pColor = leagueProfile.key==='over' ? 'var(--green)' : leagueProfile.key==='under' ? 'var(--red)' : 'var(--dim)';
+    const liftedNote = report.leagueLifted ? '<div class="op-context-lift">⬆️ Recomendação elevada por causa do perfil desta competição</div>' : '';
+    contextHtml = '<div class="op-block">' +
+      '<div class="op-block-title">🌍 Contexto da Competição</div>' +
+      '<div class="op-context-row">' +
+        '<div class="op-context-league">' + leagueProfile.icon + ' ' + leagueProfile.league + '</div>' +
+        '<div class="op-context-profile" style="color:' + pColor + ';border-color:' + pColor + ';">Perfil: ' + leagueProfile.label + (leagueProfile.adjust!==0 ? ' (' + (leagueProfile.adjust>0?'+':'') + leagueProfile.adjust + ' pt)' : '') + '</div>' +
+      '</div>' +
+      '<div class="op-context-desc">' + leagueProfile.desc + '</div>' +
+      liftedNote +
+    '</div>';
+  }
 
-  const btn = (active, color) => ({
-    padding: '0.6rem 1.4rem', borderRadius: '99px', fontSize: '0.85rem', fontWeight: 700,
-    cursor: 'pointer', border: `1px solid ${active ? color : colors.border}`,
-    background: active ? `${color}33` : 'transparent', color: active ? color : colors.textSecondary,
-    transition: 'all 0.2s'
+  document.getElementById('opReport').innerHTML=`
+    <div class="op-banner" id="opBanner" style="background:${dim};border-color:${brd}"><div class="op-banner-emoji">${emj}</div><div class="op-banner-label">${report.label}</div></div>
+    <div class="op-block"><div class="op-block-title">📊 Leitura do Mercado</div><div class="op-readings">${readHtml}</div>${scenHtml}</div>
+    ${stakeHtml}
+    ${contextHtml}
+    <div class="op-block op-plan-block" style="border-color:${brd}"><div class="op-block-title">📌 Plano Operacional</div><div class="op-plan-headline">${report.plan}</div><div class="op-plan-detail">${report.planDetail}</div></div>
+    ${adjHtml}`;
+  applyScorePanelState();
+
+  document.getElementById('inputSection').style.display='none';
+  document.getElementById('fab').classList.remove('visible');
+  document.getElementById('resultSection').classList.add('show');
+  // snapshot raw inputs so editAnalysis() can repopulate fields
+  const _scoreOdds = {};
+  [...BASIC_SCORES,...ADV_SCORES].forEach(s => { const v=parseScoreOdd(s); if(v!==null) _scoreOdds[s]=v; });
+  currentResult={
+    match, league, scores, total, maxPts, verdict, ts, report, favObj,
+    cardStates: {...cardOn},
+    inputs: {
+      oddA:   parseOdd('f-oddA'),
+      empate: parseOdd('f-empate'),
+      oddB:   parseOdd('f-oddB'),
+      over:   parseOdd('f-over'),
+      under:  parseOdd('f-under'),
+      sim:    parseOdd('f-sim'),
+      nao:    parseOdd('f-nao'),
+      scoreOdds: _scoreOdds,
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// fix #14: COPY REPORT
+// ═══════════════════════════════════════════════
+function copyReport() {
+  if(!currentResult) return;
+  const r=currentResult.report;
+  const m=currentResult;
+  let txt=`$cannerGol — Análise\n`;
+  txt+=`${m.league||'—'} · ${m.match}\n${m.ts}\n`;
+  if(m.favObj) txt+=`${m.favObj.icon} ${m.favObj.label}\n`;
+  txt+=`━━━━━━━━━━━━━━━\n`;
+  txt+=`${ICONS[r.cls]} ${r.label}\n`;
+  if(r.stake!=='—') txt+=`Stake: ${r.stake} · Mercado: ${r.market}\n`;
+  txt+=`Pontuação: ${m.total}/${m.maxPts}\n━━━━━━━━━━━━━━━\n`;
+  txt+=`📊 Leitura\n`;
+  r.readings.forEach(rd=>{ txt+=(rd.ok===true?'✅':rd.ok==='warn'?'⚠️':'❌')+' '+rd.text+'\n'; });
+  if(r.goalsScen.length) txt+=`\n💡 Cenários: ${r.goalsScen.slice(0,4).join(', ')}\n`;
+  txt+=`\n📌 ${r.plan}\n${r.planDetail}\n`;
+  if(r.adjs.length) { txt+=`\n🚨 Ajustes:\n`; r.adjs.forEach(a=>txt+=`${a.dir==='down'?'⬇️':'⬆️'} ${a.market}: ${a.msg}\n`); }
+  navigator.clipboard.writeText(txt).then(()=>toast('📋 Relatório copiado!')).catch(()=>toast('⚠️ Não foi possível copiar'));
+}
+
+// ═══════════════════════════════════════════════
+// RESET
+// ═══════════════════════════════════════════════
+function resetForm() {
+  document.getElementById('resultSection').classList.remove('show');
+  document.getElementById('inputSection').style.display='block';
+  ['f-league','f-teamA','f-teamB','f-oddA','f-empate','f-oddB','f-over','f-under','f-sim','f-nao'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  [...BASIC_SCORES,...ADV_SCORES].forEach(s=>{
+    const el=document.getElementById('sc-'+s); if(el) el.value='';
+    const lbl=document.getElementById('lbl-'+s); if(lbl) lbl.classList.remove('danger','top');
+    const rk=document.getElementById('rank-'+s); if(rk) rk.textContent='';
+  });
+  ['id','res','ou','btts','pc'].forEach(k=>setDot(k,false));
+  document.getElementById('progressFill').style.width='0%';
+  currentResult=null; currentReport=null;
+  _scorePanelCollapsed = false;
+}
+
+// ═══════════════════════════════════════════════
+// EDIT ANALYSIS — repopulate fields from currentResult
+// ═══════════════════════════════════════════════
+function editAnalysis() {
+  if (!currentResult) return;
+  const s = currentResult.scores;
+  const inputs = currentResult.inputs || {};
+
+  // Hide result, show form
+  document.getElementById('resultSection').classList.remove('show');
+  document.getElementById('inputSection').style.display = 'block';
+
+  // Card 01 — Identification
+  if (currentResult.league) setVal('f-league', currentResult.league);
+  const parts = (currentResult.match || '').split(' x ');
+  if (parts[0]) setVal('f-teamA', parts[0].trim());
+  if (parts[1]) setVal('f-teamB', parts[1].trim());
+
+  // Card 02 — Resultado (raw odds from saved inputs)
+  if (inputs.oddA)   setOddVal('f-oddA',   inputs.oddA);
+  if (inputs.empate) setOddVal('f-empate',  inputs.empate);
+  if (inputs.oddB)   setOddVal('f-oddB',    inputs.oddB);
+
+  // Card 03 — Over/Under
+  if (inputs.over)  setOddVal('f-over',  inputs.over);
+  if (inputs.under) setOddVal('f-under', inputs.under);
+
+  // Card 04 — BTTS
+  if (inputs.sim) setOddVal('f-sim', inputs.sim);
+  if (inputs.nao) setOddVal('f-nao', inputs.nao);
+
+  // Card 05 — Correct score
+  if (inputs.scoreOdds) {
+    Object.entries(inputs.scoreOdds).forEach(([score, val]) => {
+      setOddVal('sc-' + score, val);
+    });
+    updateScoreRanks();
+  }
+
+  // Restore card on/off states
+  if (currentResult.cardStates) {
+    Object.entries(currentResult.cardStates).forEach(([id, on]) => {
+      if (cardOn[id] !== on) toggleCard(id);
+    });
+  }
+
+  checkDots(); updateProgress();
+  // Scroll back to top
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) { el.value = val; el.classList.toggle('has-val', !!val); }
+}
+
+function setOddVal(id, val) {
+  const el = document.getElementById(id);
+  if (!el || !val) return;
+  el.value = typeof val === 'number' ? val.toFixed(2) : val;
+  el.classList.add('has-val');
+}
+
+// ═══════════════════════════════════════════════
+// BILHETES
+// ═══════════════════════════════════════════════
+function sendToBilhetes() {
+  if(!currentResult) return;
+  const bil=DB.bilhetes();
+  // fix #7: store report snapshot. initialInputs = frozen snapshot of odds at analysis time (never overwritten)
+  bil.unshift({
+    id:Date.now(),
+    ...currentResult,
+    htA:'',htB:'',ftA:'',ftB:'',
+    initialInputs: {...currentResult.inputs}
+  });
+  DB.saveBil(bil);
+  updateBadges(); resetForm(); goPageDirect('bilhetes'); renderBilhetes();
+  toast('🎫 Enviado para Bilhetes!');
+}
+
+// fix #13: save directly to catalog (for already-played games)
+function saveDirect() {
+  if(!currentResult) return;
+  const ftA=prompt('Gols Time A (FT):','');
+  const ftB=prompt('Gols Time B (FT):','');
+  if(ftA===null||ftB===null) return;
+  const ft=`${ftA}x${ftB}`;
+  const htA=prompt('Gols Time A (HT):','');
+  const htB=prompt('Gols Time B (HT):','');
+  const ht=htA!==null&&htB!==null?`${htA}x${htB}`:'';
+  const entry={id:Date.now(),...currentResult,htScore:ht,ftScore:ft,catalogTs:new Date().toLocaleDateString('pt-BR')};
+  const cat=DB.catalog(); cat.unshift(entry); DB.saveCat(cat);
+  checkZeroZero(entry);
+  updateBadges(); resetForm(); goPageDirect('catalog'); renderCatalog();
+  toast('📚 Catalogado!');
+}
+
+function renderBilhetes() {
+  const list = DB.bilhetes();
+  const el = document.getElementById('bilhetesList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🎫</div><div class="empty-title">Nenhum bilhete pendente</div><div class="empty-desc">Após analisar, clique em "Enviar para Bilhetes" para acompanhar o resultado.</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(b => {
+    const mList = [
+      {label:'Resultado', data:b.scores.r, w:1},
+      {label:'+/-2.5',    data:b.scores.o, w:2},
+      {label:'BTTS',      data:b.scores.b, w:1},
+      {label:'Placar',    data:b.scores.c, w:2},
+    ].filter(m => m.data);
+    const cls = b.verdict?.cls || 'red';
+    const metricsHtml = mList.map(m =>
+      '<div class="bc-mi"><span class="bc-mi-label">' + m.label + '</span>' +
+      '<span class="bc-mi-val">' + ICONS[m.data.s] + ' ' + (m.data.pts * m.w) + 'pts</span></div>'
+    ).join('');
+
+    const htConfirmed = !!b.htConfirmed;
+    const ftConfirmed = !!b.ftConfirmed;
+    const htAVal = b.htA || '';
+    const htBVal = b.htB || '';
+    const ftAVal = b.ftA || '';
+    const ftBVal = b.ftB || '';
+
+    // ── EDIT LOCK NOTE — only before HT confirmed, edit is allowed ──
+    const editNote = htConfirmed
+      ? '<div class="bc-edit-locked-note">🔒 Análise definitiva — edição bloqueada após confirmação do HT</div>'
+      : '';
+
+    // ── HT BLOCK ──
+    let htBlock;
+    if (htConfirmed) {
+      htBlock =
+        '<div class="bc-step-group">' +
+          '<div class="bc-step-label-row"><span class="bc-step-label">Resultado HT</span><span class="bc-step-status done">✅ Confirmado</span></div>' +
+          '<div class="bc-score-inputs">' +
+            '<input class="bc-score-num" value="' + htAVal + '" disabled>' +
+            '<span class="bc-score-sep">×</span>' +
+            '<input class="bc-score-num" value="' + htBVal + '" disabled>' +
+          '</div>' +
+        '</div>';
+    } else {
+      htBlock =
+        '<div class="bc-step-group">' +
+          '<div class="bc-step-label-row"><span class="bc-step-label">Resultado HT</span><span class="bc-step-status pending">Pendente</span></div>' +
+          '<div class="bc-score-inputs">' +
+            '<input class="bc-score-num" id="htA-' + b.id + '" type="number" min="0" max="20" placeholder="0" value="' + htAVal + '" oninput="liveSaveBilhete(' + b.id + ')">' +
+            '<span class="bc-score-sep">×</span>' +
+            '<input class="bc-score-num" id="htB-' + b.id + '" type="number" min="0" max="20" placeholder="0" value="' + htBVal + '" oninput="liveSaveBilhete(' + b.id + ')">' +
+          '</div>' +
+          '<button class="bc-step-confirm-btn" id="btnHt-' + b.id + '" onclick="confirmHT(' + b.id + ')">Confirmar HT</button>' +
+        '</div>';
+    }
+
+    // ── FT BLOCK ──
+    let ftBlock;
+    if (ftConfirmed) {
+      ftBlock =
+        '<div class="bc-step-group">' +
+          '<div class="bc-step-label-row"><span class="bc-step-label">Resultado FT</span><span class="bc-step-status done">☑️ Confirmado</span></div>' +
+          '<div class="bc-score-inputs">' +
+            '<input class="bc-score-num" value="' + ftAVal + '" disabled>' +
+            '<span class="bc-score-sep">×</span>' +
+            '<input class="bc-score-num" value="' + ftBVal + '" disabled>' +
+          '</div>' +
+        '</div>';
+    } else if (htConfirmed) {
+      ftBlock =
+        '<div class="bc-step-group">' +
+          '<div class="bc-step-label-row"><span class="bc-step-label">Resultado FT</span><span class="bc-step-status pending">Pendente</span></div>' +
+          '<div class="bc-score-inputs">' +
+            '<input class="bc-score-num" id="ftA-' + b.id + '" type="number" min="0" max="20" placeholder="0" value="' + ftAVal + '" oninput="liveSaveBilhete(' + b.id + ')">' +
+            '<span class="bc-score-sep">×</span>' +
+            '<input class="bc-score-num" id="ftB-' + b.id + '" type="number" min="0" max="20" placeholder="0" value="' + ftBVal + '" oninput="liveSaveBilhete(' + b.id + ')">' +
+          '</div>' +
+          '<button class="bc-step-confirm-btn" id="btnFt-' + b.id + '" onclick="confirmFT(' + b.id + ')">Confirmar FT</button>' +
+        '</div>';
+    } else {
+      ftBlock =
+        '<div class="bc-step-group">' +
+          '<div class="bc-step-label-row"><span class="bc-step-label">Resultado FT</span><span class="bc-step-status pending">Pendente</span></div>' +
+          '<div class="bc-step-locked-row">🔒 Bloqueado — confirme o HT primeiro</div>' +
+        '</div>';
+    }
+
+    const concludeBtn = '<button class="bc-conclude-btn" id="btnConclude-' + b.id + '" ' + (ftConfirmed ? '' : 'disabled') + ' onclick="concludeBilhete(' + b.id + ')">' +
+      (ftConfirmed ? '📚 Concluir Bilhete' : '🔒 Concluir Bilhete') + '</button>';
+
+    // ── UPDATE ODDS button — only while not yet locked (before HT confirmed) ──
+    const updateOddsBtn = htConfirmed ? '' :
+      '<button class="bc-update-odds-btn" onclick="openUpdateOdds(' + b.id + ')">📈 Atualizar Odds</button>';
+
+    // ── ODDS VARIATION HISTORY — show if odds were updated at least once ──
+    let variationHtml = '';
+    if (b.oddsUpdated && b.initialInputs) {
+      const rows = buildVariationRows(b.initialInputs, b.inputs);
+      if (rows.length) {
+        variationHtml = '<div class="bc-variation-block">' +
+          '<div class="bc-variation-title">📊 Histórico de Movimento</div>' +
+          rows.map(r =>
+            '<div class="bc-variation-row">' +
+              '<span class="bc-variation-market">' + r.label + '</span>' +
+              '<span class="bc-variation-vals"><span class="bc-var-initial">' + r.initial.toFixed(2) + '</span> → <span class="bc-var-current">' + r.current.toFixed(2) + '</span></span>' +
+              '<span class="bc-variation-delta" style="color:' + (r.diff<0?'var(--green)':'var(--red)') + '">' + (r.diff<0?'⬇️':'⬆️') + ' ' + (r.diff>0?'+':'') + r.diff.toFixed(2) + '</span>' +
+            '</div>'
+          ).join('') +
+        '</div>';
+      }
+    }
+
+    return '<div class="bc">' +
+      '<div class="bc-top">' +
+        '<div class="bc-top-left">' +
+          '<span class="bc-liga-top">' + (b.league || '—') + '</span>' +
+          '<span class="bc-match-top">' + b.match + '</span>' +
+        '</div>' +
+        '<div class="bc-top-right">' +
+          '<div class="bc-pts-block">' +
+            '<div style="font-family:var(--fm);font-size:9px;color:' + COLORS[cls] + ';margin-bottom:2px;">' + ICONS[cls] + ' ' + LABELS[cls] + '</div>' +
+            '<div style="font-family:var(--fm);font-size:12px;color:' + COLORS[cls] + '">' + b.total + '/' + b.maxPts + '</div>' +
+            '<div class="bc-liga-top">' + b.ts + '</div>' +
+          '</div>' +
+          '<div class="bc-del-x" onclick="askDiscardBilhete(' + b.id + ')" title="Descartar bilhete">✕</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bc-metrics">' + metricsHtml + '</div>' +
+      variationHtml +
+      '<div class="bc-result-row" style="flex-direction:column;align-items:stretch;gap:14px;">' +
+        editNote +
+        updateOddsBtn +
+        '<div style="display:flex;gap:14px;flex-wrap:wrap;">' + htBlock + ftBlock + '</div>' +
+        concludeBtn +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// build a list of {label, initial, current, diff} for fields that changed
+function buildVariationRows(initial, current) {
+  if (!initial || !current) return [];
+  const map = [
+    {key:'oddA',   label:'Resultado — Time A'},
+    {key:'empate', label:'Resultado — Empate'},
+    {key:'oddB',   label:'Resultado — Time B'},
+    {key:'over',   label:'Mais de 2.5'},
+    {key:'under',  label:'Menos de 2.5'},
+    {key:'sim',    label:'BTTS — SIM'},
+    {key:'nao',    label:'BTTS — NÃO'},
+  ];
+  const rows = [];
+  map.forEach(m => {
+    const i = initial[m.key], c = current[m.key];
+    if (i!=null && c!=null && Math.abs(i-c) >= 0.01) {
+      rows.push({label:m.label, initial:i, current:c, diff: Math.round((c-i)*100)/100});
+    }
+  });
+  return rows;
+}
+
+let _discardTargetId = null;
+function askDiscardBilhete(id) {
+  _discardTargetId = id;
+  document.getElementById('discardOverlay').classList.add('show');
+}
+function closeDiscardModal() {
+  _discardTargetId = null;
+  document.getElementById('discardOverlay').classList.remove('show');
+}
+function discardBilheteConfirmed() {
+  if (_discardTargetId === null) return;
+  DB.saveBil(DB.bilhetes().filter(b => b.id !== _discardTargetId));
+  closeDiscardModal();
+  updateBadges(); renderBilhetes();
+  toast('🗑 Bilhete descartado');
+}
+
+// ═══════════════════════════════════════════════
+// ATUALIZAR ODDS — edit odds on an open bilhete, recalc score/verdict/report
+// ═══════════════════════════════════════════════
+let _updateOddsTargetId = null;
+
+function openUpdateOdds(id) {
+  const bil = DB.bilhetes();
+  const entry = bil.find(b => b.id === id);
+  if (!entry) return;
+  _updateOddsTargetId = id;
+  const inp = entry.inputs || {};
+
+  const fieldDef = [
+    {key:'oddA',   label:'Resultado — Time A', show: !!entry.scores.r},
+    {key:'empate', label:'Resultado — Empate',  show: !!entry.scores.r},
+    {key:'oddB',   label:'Resultado — Time B', show: !!entry.scores.r},
+    {key:'over',   label:'Mais de 2.5',        show: !!entry.scores.o},
+    {key:'under',  label:'Menos de 2.5',       show: !!entry.scores.o},
+    {key:'sim',    label:'BTTS — SIM',         show: !!entry.scores.b},
+    {key:'nao',    label:'BTTS — NÃO',         show: !!entry.scores.b},
+  ].filter(f => f.show);
+
+  document.getElementById('updateOddsFields').innerHTML =
+    '<div class="field-rows-wrap">' +
+    fieldDef.map(f => {
+      const val = inp[f.key] != null ? inp[f.key].toFixed(2) : '';
+      return '<div class="field-row">' +
+        '<span class="field-row-label">' + f.label + '</span>' +
+        '<span class="odd-step-btn" onclick="stepUpdateOdd(\'uo-' + f.key + '\',-1)">−</span>' +
+        '<input type="text" id="uo-' + f.key + '" class="has-stepper" value="' + val + '" inputmode="numeric" oninput="autoOdd(this)" onblur="finalizeOdd(this)">' +
+        '<span class="odd-step-btn" onclick="stepUpdateOdd(\'uo-' + f.key + '\',1)">+</span>' +
+      '</div>';
+    }).join('') +
+    '</div>';
+
+  document.getElementById('updateOddsOverlay').classList.add('show');
+}
+
+function stepUpdateOdd(id, dir) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let v = parseFloat(el.value) || 1.00;
+  v = Math.round((v + dir*0.01) * 100) / 100;
+  if (v < 1.01) v = 1.01;
+  el.value = v.toFixed(2);
+}
+
+function closeUpdateOddsModal() {
+  _updateOddsTargetId = null;
+  document.getElementById('updateOddsOverlay').classList.remove('show');
+}
+
+function saveUpdatedOdds() {
+  if (_updateOddsTargetId === null) return;
+  const bil = DB.bilhetes();
+  const entry = bil.find(b => b.id === _updateOddsTargetId);
+  if (!entry) return;
+
+  const read = key => { const el = document.getElementById('uo-'+key); return el ? (parseFloat(el.value)||null) : null; };
+  const newInputs = { ...entry.inputs };
+  ['oddA','empate','oddB','over','under','sim','nao'].forEach(k => {
+    const el = document.getElementById('uo-'+k);
+    if (el) newInputs[k] = parseFloat(el.value) || null;
   });
 
-  const inputStyle = {
-    background: 'rgba(255,255,255,0.05)', border: `1px solid ${colors.border}`,
-    borderRadius: '8px', padding: '0.5rem 0.75rem', color: colors.textPrimary,
-    fontSize: '0.85rem', outline: 'none'
-  };
+  // recalc only the markets that were active
+  const r = entry.scores.r ? V.result(newInputs.oddA, newInputs.empate, newInputs.oddB) : null;
+  const o = entry.scores.o ? V.over25(newInputs.over, newInputs.under) : null;
+  const b = entry.scores.b ? V.btts(newInputs.sim, newInputs.nao) : null;
+  const c = entry.scores.c; // correct score odds are not edited here — kept as originally analyzed
 
-  function getMedal(pos) {
-    if (pos === 1) return '🥇';
-    if (pos === 2) return '🥈';
-    if (pos === 3) return '🥉';
-    return `${pos}º`;
+  const wRes=1, wOu=2, wBtts=1, wPc=2;
+  const total = (r?r.pts*wRes:0) + (o?o.pts*wOu:0) + (b?b.pts*wBtts:0) + (c&&!c.warn?c.pts*wPc:0);
+  const maxPts = entry.maxPts; // active markets don't change here, only odds values
+
+  const favObj = (r && newInputs.oddA && newInputs.oddB) ? getFavoritismo(newInputs.oddA, newInputs.oddB) : null;
+  const verdict = getVerdict(total, maxPts);
+  const report = buildOperationalReport({r,o,b,c}, total, maxPts, favObj);
+
+  entry.inputs = newInputs;
+  entry.scores = {r,o,b,c};
+  entry.total = total;
+  entry.verdict = verdict;
+  entry.report = report;
+  entry.favObj = favObj;
+  entry.oddsUpdated = true;
+
+  DB.saveBil(bil);
+  closeUpdateOddsModal();
+  renderBilhetes();
+  toast('📈 Odds atualizadas — análise recalculada');
+}
+
+// live-save score field values without confirming or locking
+function liveSaveBilhete(id) {
+  const bil = DB.bilhetes();
+  const entry = bil.find(b => b.id === id);
+  if (!entry) return;
+  const htA=document.getElementById('htA-'+id), htB=document.getElementById('htB-'+id);
+  const ftA=document.getElementById('ftA-'+id), ftB=document.getElementById('ftB-'+id);
+  if (htA) entry.htA = htA.value; if (htB) entry.htB = htB.value;
+  if (ftA) entry.ftA = ftA.value; if (ftB) entry.ftB = ftB.value;
+  DB.saveBil(bil);
+}
+
+// Step 1: confirm HT — locks editing of the analysis permanently
+function confirmHT(id) {
+  const htA = document.getElementById('htA-'+id)?.value;
+  const htB = document.getElementById('htB-'+id)?.value;
+  if (htA==='' || htA===undefined || htB==='' || htB===undefined) { toast('⚠️ Informe o Resultado HT'); return; }
+  const bil = DB.bilhetes();
+  const entry = bil.find(b => b.id === id);
+  if (!entry) return;
+  entry.htA = htA; entry.htB = htB;
+  entry.htConfirmed = true;
+  entry.locked = true; // analysis becomes definitive — odds/criteria can no longer change
+  DB.saveBil(bil);
+  renderBilhetes();
+  toast('✅ HT confirmado — análise tornou-se definitiva');
+}
+
+// Step 2: confirm FT — unlocks "Concluir Bilhete"
+function confirmFT(id) {
+  const ftA = document.getElementById('ftA-'+id)?.value;
+  const ftB = document.getElementById('ftB-'+id)?.value;
+  if (ftA==='' || ftA===undefined || ftB==='' || ftB===undefined) { toast('⚠️ Informe o Resultado FT'); return; }
+  const bil = DB.bilhetes();
+  const entry = bil.find(b => b.id === id);
+  if (!entry) return;
+  entry.ftA = ftA; entry.ftB = ftB;
+  entry.ftConfirmed = true;
+  DB.saveBil(bil);
+  renderBilhetes();
+  toast('☑️ FT confirmado — pronto para concluir');
+}
+
+// Step 3: conclude bilhete — moves to Catalogação
+function concludeBilhete(id) {
+  const bil = DB.bilhetes();
+  const entry = bil.find(b => b.id === id);
+  if (!entry || !entry.ftConfirmed) { toast('🔒 Confirme HT e FT antes de concluir'); return; }
+  const ht = (entry.htA!==''&&entry.htA!==undefined && entry.htB!==''&&entry.htB!==undefined) ? entry.htA+'x'+entry.htB : '';
+  const ft = entry.ftA+'x'+entry.ftB;
+  const catEntry = {...entry, htScore: ht, ftScore: ft, catalogTs: new Date().toLocaleDateString('pt-BR')};
+  const cat = DB.catalog(); cat.unshift(catEntry); DB.saveCat(cat);
+  checkZeroZero(catEntry);
+  DB.saveBil(bil.filter(b => b.id !== id));
+  updateBadges(); renderBilhetes(); renderCatalog(); renderZeroPanel();
+  toast('📚 Bilhete concluído e enviado para Catalogação!');
+}
+
+function checkZeroZero(entry) {
+  const {ftScore}=entry;
+  if(!ftScore)return;
+  const m=ftScore.replace(/\s/g,'').match(/^(\d+)[x\-](\d+)$/i);
+  if(m&&parseInt(m[1])===0&&parseInt(m[2])===0) {
+    const z=DB.zeros();
+    z.unshift({id:entry.id,match:entry.match,league:entry.league,ts:entry.ts,total:entry.total,maxPts:entry.maxPts,verdict:entry.verdict});
+    DB.saveZ(z);
+    document.getElementById('zeroCnt').textContent=DB.zeros().length;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// CATALOGAÇÃO
+// ═══════════════════════════════════════════════
+function setFilter(f,el) {
+  _filter=f;
+  document.querySelectorAll('.cat-f').forEach(x=>x.classList.remove('active'));
+  if(el)el.classList.add('active');
+  renderCatalog();
+}
+function setLeague(v){_league=v;renderCatalog();}
+
+function hasGoals(ft) {
+  if(!ft)return false;
+  const m=ft.replace(/\s/g,'').match(/^(\d+)[x\-](\d+)$/i);
+  return m?parseInt(m[1])+parseInt(m[2])>0:false;
+}
+
+function totalGoals(ft) {
+  if(!ft) return null;
+  const m=ft.replace(/\s/g,'').match(/^(\d+)[x\-](\d+)$/i);
+  return m ? parseInt(m[1])+parseInt(m[2]) : null;
+}
+
+// avalia se a recomendação de mercado "bateu" com o resultado real (FT)
+function evaluateOperation(market, ftScore) {
+  const goals = totalGoals(ftScore);
+  if (goals === null || !market || market === '—') return null;
+  if (market.includes('1.5')) return { hit: goals >= 2, label: market };
+  if (market.includes('0.5')) return { hit: goals >= 1, label: market };
+  return null;
+}
+
+// fix #15: group by league for stats
+function renderCatalog() {
+  let list=DB.catalog();
+  const leagues=[...new Set(list.map(e=>e.league).filter(Boolean))];
+  const sel=document.querySelector('.cat-f select');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todas as ligas</option>'+leagues.map(l=>`<option value="${l}" ${l===cur?'selected':''}>${l}</option>`).join('');
+
+  if(_filter==='green')      list=list.filter(e=>e.verdict?.cls==='green');
+  else if(_filter==='yellow') list=list.filter(e=>e.verdict?.cls==='yellow');
+  else if(_filter==='orange') list=list.filter(e=>e.verdict?.cls==='orange');
+  else if(_filter==='red')    list=list.filter(e=>e.verdict?.cls==='red');
+  else if(_filter==='with_goals') list=list.filter(e=>hasGoals(e.ftScore));
+  else if(_filter==='no_goals')   list=list.filter(e=>!hasGoals(e.ftScore));
+  if(_league) list=list.filter(e=>e.league===_league);
+
+  const all=DB.catalog();
+  // fix #15: per-league accuracy
+  const leagueStats={};
+  all.forEach(e=>{ if(!e.league)return; if(!leagueStats[e.league]) leagueStats[e.league]={t:0,g:0}; leagueStats[e.league].t++; if(e.verdict?.cls==='green'||e.verdict?.cls==='yellow') leagueStats[e.league].g++; });
+
+  document.getElementById('statsBar').innerHTML=`
+    <div class="stat-it"><div class="stat-val">${all.length}</div><div class="stat-lab">Catalogados</div></div>
+    <div class="stat-it"><div class="stat-val" style="color:var(--green)">${all.filter(e=>e.verdict?.cls==='green').length}</div><div class="stat-lab">+1.5G</div></div>
+    <div class="stat-it"><div class="stat-val" style="color:var(--yellow)">${all.filter(e=>e.verdict?.cls==='yellow').length}</div><div class="stat-lab">+0.5G</div></div>
+    <div class="stat-it"><div class="stat-val" style="color:var(--red)">${all.filter(e=>!e.verdict?.cls||e.verdict.cls==='red').length}</div><div class="stat-lab">Fora</div></div>
+    <div class="stat-it"><div class="stat-val" style="color:var(--orange)">${DB.zeros().length}</div><div class="stat-lab">0×0</div></div>`;
+
+  const el=document.getElementById('catalogList');
+  if(!list.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📚</div><div class="empty-title">Nenhum jogo catalogado</div><div class="empty-desc">Confirme resultados na aba Bilhetes ou use "Catalogar direto" na análise.</div></div>`;return;}
+  el.innerHTML=list.map(e=>{
+    const cls=e.verdict?.cls||'red';
+    return `<div class="cat-card" onclick="openCatalogDetail(${e.id})"><div class="cat-row">
+      <div class="cat-dot" style="background:${COLORS[cls]}"></div>
+      <div class="cat-info"><div class="cat-match">${e.match}</div><div class="cat-sub">${e.league||'—'} · ${e.ts}</div></div>
+      <div class="cat-scores">
+        <div class="cat-sbox"><div class="cat-slabel">HT</div><div class="cat-sval">${e.htScore||'—'}</div></div>
+        <div class="cat-sbox"><div class="cat-slabel">FT</div><div class="cat-sval" style="color:${hasGoals(e.ftScore)?'var(--green)':'var(--red)'}">${e.ftScore||'—'}</div></div>
+      </div>
+      <div class="cat-right">
+        <span class="pill ${cls==='green'?'pill-g':cls==='yellow'?'pill-y':'pill-r'}">${ICONS[cls]} ${LABELS[cls]}</span>
+        <span class="cat-pts" style="color:${COLORS[cls]}">${e.total}/${e.maxPts}</span>
+        <span class="cat-date">${e.catalogTs||e.ts}</span>
+      </div>
+    </div></div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// CATALOG DETAIL MODAL — visualização completa da análise
+// ═══════════════════════════════════════════════
+function closeCatalogDetail() { document.getElementById('catalogDetailOverlay').classList.remove('show'); }
+
+function openCatalogDetail(id) {
+  const entry = DB.catalog().find(e => e.id === id);
+  if (!entry) return;
+  const cls = entry.verdict?.cls || 'red';
+  const clr = COLORS[cls];
+  const dim = CLS_DIM[cls];
+  const brd = CLS_BORDER[cls];
+
+  document.getElementById('catDetailTitle').textContent = '🏆 ' + entry.match;
+
+  // ── Dados do confronto ──
+  let html = '<div class="cd-section">' +
+    '<div class="cd-section-title">Dados do Confronto</div>' +
+    '<div class="cd-grid">' +
+      '<div class="cd-info-box"><div class="cd-info-label">Competição</div><div class="cd-info-val">' + (entry.league || '—') + '</div></div>' +
+      '<div class="cd-info-box"><div class="cd-info-label">Data da Análise</div><div class="cd-info-val">' + entry.ts + '</div></div>' +
+      '<div class="cd-info-box"><div class="cd-info-label">Data Catalogado</div><div class="cd-info-val">' + (entry.catalogTs || '—') + '</div></div>' +
+      '<div class="cd-info-box"><div class="cd-info-label">Confronto</div><div class="cd-info-val">' + entry.match + '</div></div>' +
+    '</div>' +
+  '</div>';
+
+  // ── Resultado real ──
+  html += '<div class="cd-section">' +
+    '<div class="cd-section-title">Resultado Real</div>' +
+    '<div class="cd-score-pair">' +
+      '<div class="cd-score-block"><div class="cd-score-block-label">HT</div><div class="cd-score-block-val">' + (entry.htScore || '—') + '</div></div>' +
+      '<div style="color:var(--muted);font-size:18px;">→</div>' +
+      '<div class="cd-score-block"><div class="cd-score-block-label">FT</div><div class="cd-score-block-val" style="color:' + (hasGoals(entry.ftScore)?'var(--green)':'var(--red)') + '">' + (entry.ftScore || '—') + '</div></div>' +
+    '</div>' +
+  '</div>';
+
+  // ── Recomendação da época ──
+  const report = entry.report;
+  if (report) {
+    html += '<div class="cd-section">' +
+      '<div class="cd-section-title">Recomendação da Época</div>' +
+      '<div class="cd-rec-card" style="background:' + dim + ';border-color:' + brd + ';">' +
+        '<div class="cd-rec-top"><span style="font-size:18px;">' + ICONS[cls] + '</span><span class="cd-rec-label" style="color:' + clr + ';">' + report.label + '</span></div>' +
+        (report.market && report.market!=='—' ? '<div class="cd-rec-market">Mercado: ' + report.market + (report.stake&&report.stake!=='—' ? ' · Stake ' + report.stake : '') + '</div>' : '') +
+      '</div>' +
+    '</div>';
   }
 
-  return (
-    <div style={{
-      fontFamily: "'Segoe UI', system-ui, sans-serif", background: colors.bgSpace,
-      color: colors.textPrimary, minHeight: '100vh', position: 'relative', overflow: 'hidden',
-      lineHeight: 1.6
-    }}>
-      {/* Stars */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}>
-        {stars.map((s, i) => (
-          <div key={i} style={{
-            position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: `${s.size}px`, height: `${s.size}px`,
-            borderRadius: '50%', background: 'rgba(200,180,255,0.8)', opacity: s.opacity
-          }} />
-        ))}
-      </div>
-      {/* Nebulas */}
-      <div style={{ position: 'absolute', width: '400px', height: '350px', background: '#7c3aed', top: '-100px', left: '-100px', borderRadius: '50%', filter: 'blur(80px)', opacity: 0.12, pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', width: '350px', height: '300px', background: '#1d4ed8', bottom: '50px', right: '-80px', borderRadius: '50%', filter: 'blur(80px)', opacity: 0.12, pointerEvents: 'none' }} />
+  // ── Painel de análise original (4 mercados) ──
+  const scores = entry.scores || {};
+  const marketDefs = [
+    {key:'r', label:'Resultado da Partida', w:1},
+    {key:'o', label:'Mais/Menos 2.5',        w:2},
+    {key:'b', label:'Ambas Marcam',          w:1},
+    {key:'c', label:'Placar Exato',          w:2},
+  ];
+  html += '<div class="cd-section"><div class="cd-section-title">Painel de Análise Original</div>';
+  marketDefs.forEach(m => {
+    const data = scores[m.key];
+    if (!data) return;
+    html += '<div class="cd-market-card">' +
+      '<div class="cd-market-top"><span class="cd-market-name">' + ICONS[data.s] + ' ' + m.label + '</span><span class="cd-market-pts" style="color:' + COLORS[data.s] + ';">' + (data.pts*m.w) + ' pts ×' + m.w + '</span></div>' +
+      '<div class="cd-market-detail">' + data.detail + '</div>' +
+    '</div>';
+  });
+  html += '</div>';
 
-      {/* Toasts */}
-      <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 999, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {toasts.map(t => (
-          <div key={t.id} style={{
-            ...cardStyle, padding: '0.75rem 1.25rem', fontSize: '0.85rem', fontWeight: 600,
-            color: colors.textPrimary, boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-            borderColor: t.type === 'success' ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)'
-          }}>
-            {t.msg}
-          </div>
-        ))}
-      </div>
+  // ── Pontuação final + distribuição ──
+  const gCount = marketDefs.filter(m=>scores[m.key]&&scores[m.key].s==='green').length;
+  const yCount = marketDefs.filter(m=>scores[m.key]&&scores[m.key].s==='yellow').length;
+  const rCount = marketDefs.filter(m=>scores[m.key]&&scores[m.key].s==='red').length;
+  html += '<div class="cd-section">' +
+    '<div class="cd-section-title">Pontuação Final</div>' +
+    '<div class="cd-score-pair" style="justify-content:space-between;">' +
+      '<div class="cd-score-block"><div class="cd-score-block-val" style="color:' + clr + ';">' + entry.total + '/' + entry.maxPts + '</div></div>' +
+      '<div class="cd-dist-row">' +
+        '<span class="pill pill-g">🟢 ' + gCount + '</span>' +
+        '<span class="pill pill-y">🟡 ' + yCount + '</span>' +
+        '<span class="pill pill-r">🔴 ' + rCount + '</span>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
 
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1rem', position: 'relative', zIndex: 1 }}>
-        {/* Header */}
-        <header style={{ textAlign: 'center', padding: '2.5rem 1rem 1rem' }}>
-          <div style={{
-            display: 'inline-block', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.2em',
-            textTransform: 'uppercase', color: colors.purple, background: 'rgba(168,85,247,0.1)',
-            border: '1px solid rgba(168,85,247,0.3)', borderRadius: '99px', padding: '4px 14px', marginBottom: '1rem'
-          }}>
-            ⚡ Copa do Mundo • Temporada 2026
-          </div>
-          <h1 style={{ fontSize: 'clamp(2rem, 6vw, 3.5rem)', fontWeight: 900, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>
-            <span>👽</span>{' '}
-            <span style={{
-              background: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 50%, #22c55e 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'
-            }}>
-              Bolão dos Aliens
-            </span>
-          </h1>
-          <p style={{ color: colors.textSecondary, fontSize: '1rem' }}>
-            Classificação em tempo real dos melhores palpiteiros da galáxia
-          </p>
-        </header>
+  // ── Comparação recomendação x resultado real ──
+  if (report && report.market && report.market !== '—') {
+    const evalRes = evaluateOperation(report.market, entry.ftScore);
+    if (evalRes) {
+      html += '<div class="cd-section">' +
+        '<div class="cd-section-title">Resultado da Operação</div>' +
+        '<div class="cd-op-result ' + (evalRes.hit?'hit':'miss') + '">' +
+          '<div><div class="cd-op-result-label">Recomendação: ' + evalRes.label + '</div></div>' +
+          '<div class="cd-op-result-status" style="color:' + (evalRes.hit?'var(--green)':'var(--red)') + ';">' + (evalRes.hit?'✅ Acertou':'❌ Não atingido') + '</div>' +
+        '</div>' +
+      '</div>';
+    }
+  }
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', margin: '1.25rem 0', flexWrap: 'wrap' }}>
-          <button style={btn(view === 'ranking', colors.purple)} onClick={() => setView('ranking')}>🏆 Classificação</button>
-          <button style={btn(view === 'jogos', colors.cyan)} onClick={() => setView('jogos')}>⚽ Jogos</button>
-          <button style={btn(view === 'admin', colors.red)} onClick={() => setView('admin')}>⚙️ Admin</button>
-        </div>
+  // ── Destaque jogo sem gols ──
+  if (entry.ftScore && totalGoals(entry.ftScore) === 0) {
+    html += '<div class="cd-zero-highlight">🎯 Jogo Sem Gols — enviado para a lista de observação 0×0</div>';
+  }
 
-        {/* Search */}
-        {(view === 'ranking' || view === 'jogos') && (
-          <div style={{ position: 'relative', marginBottom: '1rem' }}>
-            <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted, fontSize: '1rem', pointerEvents: 'none' }}>🔍</span>
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={view === 'ranking' ? 'Buscar participante...' : 'Buscar time, ex: Brasil...'}
-              style={{ ...inputStyle, width: '100%', borderRadius: '99px', padding: '0.65rem 1.25rem 0.65rem 2.75rem', fontSize: '0.9rem' }}
-            />
-          </div>
-        )}
-
-        {/* ============ VIEW RANKING ============ */}
-        {view === 'ranking' && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', margin: '0 0 1.5rem' }}>
-              <div style={{ ...cardStyle, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ fontSize: '1.75rem' }}>👾</div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textMuted, marginBottom: '2px' }}>Participantes</label>
-                  <span style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: colors.purple }}>{data.participantes.length}</span>
-                </div>
-              </div>
-              <div style={{ ...cardStyle, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ fontSize: '1.75rem' }}>🎯</div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textMuted, marginBottom: '2px' }}>Placares Exatos</label>
-                  <span style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: colors.green }}>{totalExato}</span>
-                </div>
-              </div>
-              <div style={{ ...cardStyle, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ fontSize: '1.75rem' }}>⚡</div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textMuted, marginBottom: '2px' }}>Pontos Dist.</label>
-                  <span style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: colors.blue }}>{totalPts}</span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: colors.textMuted, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              🚀 Classificação Geral
-              <div style={{ flex: 1, height: '1px', background: colors.border }} />
-            </div>
-
-            <div style={{ ...cardStyle, overflow: 'hidden', boxShadow: '0 0 40px rgba(168,85,247,0.08)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(168,85,247,0.08)', borderBottom: `1px solid ${colors.border}` }}>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'center', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textMuted, width: '60px' }}>Pos</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textMuted }}>Participante</th>
-                    <th
-                      onClick={() => setSortField('exatos')}
-                      style={{ padding: '0.85rem 1rem', textAlign: 'left', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: sortField === 'exatos' ? colors.purple : colors.textMuted, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                    >
-                      Placares Exatos{sortField === 'exatos' ? ' ↓' : ''}
-                    </th>
-                    <th
-                      onClick={() => setSortField('vencedores')}
-                      style={{ padding: '0.85rem 1rem', textAlign: 'left', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: sortField === 'vencedores' ? colors.purple : colors.textMuted, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                    >
-                      Acertos Venc/Emp{sortField === 'vencedores' ? ' ↓' : ''}
-                    </th>
-                    <th
-                      onClick={() => setSortField('total')}
-                      style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: sortField === 'total' ? colors.purple : colors.textMuted, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                    >
-                      Pts Total{sortField === 'total' ? ' ↓' : ''}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRanking.length === 0 ? (
-                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2.5rem', color: colors.textMuted, fontSize: '0.9rem' }}>🔭 Nenhum participante encontrado</td></tr>
-                  ) : filteredRanking.map(p => {
-                    const realPos = sortedRanking.findIndex(s => s.id === p.id) + 1;
-                    const isLeader = realPos === 1;
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => setModalParticipant(p.id)}
-                        style={{
-                          borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'background 0.2s',
-                          background: isLeader ? 'rgba(168,85,247,0.07)' : 'transparent',
-                          borderLeft: isLeader ? `3px solid ${colors.purple}` : 'none'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,80,255,0.12)'}
-                        onMouseLeave={e => e.currentTarget.style.background = isLeader ? 'rgba(168,85,247,0.07)' : 'transparent'}
-                      >
-                        <td style={{ padding: '0.9rem 1rem', textAlign: 'center' }}>
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: '32px', height: '32px', borderRadius: '50%', fontSize: realPos <= 3 ? '1.1rem' : '0.85rem',
-                            fontWeight: 700,
-                            background: realPos === 1 ? 'rgba(251,191,36,0.15)' : realPos === 2 ? 'rgba(148,163,184,0.15)' : realPos === 3 ? 'rgba(205,124,47,0.15)' : 'rgba(255,255,255,0.05)',
-                            color: realPos === 1 ? colors.gold : realPos === 2 ? colors.silver : realPos === 3 ? colors.bronze : colors.textMuted
-                          }}>
-                            {getMedal(realPos)}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.9rem 1rem', fontWeight: 600, fontSize: '0.95rem' }}>{p.nome}</td>
-                        <td style={{ padding: '0.9rem 1rem', color: colors.green, fontWeight: 700 }}>{p.exatos}</td>
-                        <td style={{ padding: '0.9rem 1rem', color: colors.cyan, fontWeight: 600 }}>{p.vencedores}</td>
-                        <td style={{ padding: '0.9rem 1rem', textAlign: 'right', fontSize: '1.05rem', fontWeight: 900, color: isLeader ? colors.gold : colors.purple }}>{p.total}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {/* ============ VIEW JOGOS ============ */}
-        {view === 'jogos' && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', margin: '0 0 1.25rem' }}>
-              <div style={{ ...cardStyle, padding: '0.85rem 1rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>🔵</div>
-                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Futuros</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: colors.blue }}>{counts.futuro}</div>
-              </div>
-              <div style={{ ...cardStyle, padding: '0.85rem 1rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>🟡</div>
-                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Aguardando</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: colors.gold }}>{counts.aguardando}</div>
-              </div>
-              <div style={{ ...cardStyle, padding: '0.85rem 1rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>🟢</div>
-                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Finalizados</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: colors.green }}>{counts.finalizado}</div>
-              </div>
-              <div style={{ ...cardStyle, padding: '0.85rem 1rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>📊</div>
-                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Total</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: colors.purple }}>{counts.total}</div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              <button style={btn(gameTab === 'abertos', colors.cyan)} onClick={() => setGameTab('abertos')}>⚽ Jogos em Aberto ({jogosAbertos.length})</button>
-              <button style={btn(gameTab === 'finalizados', colors.green)} onClick={() => setGameTab('finalizados')}>✅ Finalizados ({jogosFinalizados.length})</button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-              {(gameTab === 'abertos' ? jogosAbertos : jogosFinalizados).filter(filterGame).length === 0 && (
-                <div style={{ ...cardStyle, padding: '2.5rem', textAlign: 'center', color: colors.textMuted, fontSize: '0.9rem', gridColumn: '1 / -1' }}>
-                  🔭 Nenhum jogo encontrado
-                </div>
-              )}
-              {(gameTab === 'abertos' ? jogosAbertos : jogosFinalizados).filter(filterGame).map(jogo => {
-                const st = STATUS[jogo.status];
-                const expanded = !!expandedGames[jogo.id];
-                const confirmedCount = Object.values(jogo.palpites).filter(p => p.confirmado).length;
-                return (
-                  <div key={jogo.id} style={{
-                    ...cardStyle, padding: '1rem', border: `1px solid ${st.border}55`,
-                    background: st.bg, position: 'relative'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: st.border, background: `${st.border}22`, padding: '2px 10px', borderRadius: '99px', border: `1px solid ${st.border}55` }}>
-                        {st.icon} {st.label}
-                      </span>
-                      {adminLoggedIn && (
-                        <button
-                          onClick={() => editGameTeams(jogo.id)}
-                          title="Editar nomes dos times"
-                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '2px 8px', cursor: 'pointer', color: colors.textSecondary, fontSize: '0.78rem' }}
-                        >
-                          ✏️
-                        </button>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.5rem', textAlign: 'center' }}>
-                      {jogo.timeA} <span style={{ color: colors.textMuted }}>×</span> {jogo.timeB}
-                    </div>
-
-                    {jogo.status === 'finalizado' ? (
-                      <div style={{ textAlign: 'center', fontSize: '1.4rem', fontWeight: 900, color: colors.green, marginBottom: '0.5rem' }}>
-                        {jogo.resultadoA} x {jogo.resultadoB}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '0.78rem', color: colors.textSecondary, textAlign: 'center', marginBottom: '0.5rem' }}>
-                        Resultado oficial pendente
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: '0.75rem', color: colors.textMuted, textAlign: 'center', marginBottom: '0.75rem' }}>
-                      Palpites confirmados: {confirmedCount} / {data.participantes.length}
-                    </div>
-
-                    {/* Admin: resultado oficial */}
-                    {adminLoggedIn && jogo.status !== 'finalizado' && (
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                        <input
-                          type="text" inputMode="numeric" placeholder="0"
-                          value={(resultInputs[jogo.id] && resultInputs[jogo.id].golsA) || ''}
-                          onChange={e => setResultInput(jogo.id, 'golsA', e.target.value)}
-                          style={{ ...inputStyle, width: '48px', textAlign: 'center', fontWeight: 700 }}
-                        />
-                        <span style={{ color: colors.textMuted }}>x</span>
-                        <input
-                          type="text" inputMode="numeric" placeholder="0"
-                          value={(resultInputs[jogo.id] && resultInputs[jogo.id].golsB) || ''}
-                          onChange={e => setResultInput(jogo.id, 'golsB', e.target.value)}
-                          style={{ ...inputStyle, width: '48px', textAlign: 'center', fontWeight: 700 }}
-                        />
-                        <button onClick={() => confirmResult(jogo.id)} style={btn(true, colors.green)}>✅ Confirmar Resultado</button>
-                      </div>
-                    )}
-                    {adminLoggedIn && jogo.status === 'finalizado' && (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                        <button onClick={() => clearResult(jogo.id)} style={btn(false, colors.purple)}>↩ Limpar resultado</button>
-                        <button onClick={() => removeGame(jogo.id)} style={btn(false, colors.red)}>🗑️ Remover jogo</button>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => toggleExpand(jogo.id)}
-                      style={{ ...btn(false, colors.purple), width: '100%', justifyContent: 'center', display: 'flex' }}
-                    >
-                      {expanded ? '▲ Ocultar Participantes' : '▼ Mostrar Participantes'}
-                    </button>
-
-                    {expanded && (
-                      <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {data.participantes.map(p => {
-                          const palpite = jogo.palpites[p.id];
-                          const key = `${jogo.id}-${p.id}`;
-                          const pts = palpite && palpite.confirmado ? calcPoints(palpite.golsA, palpite.golsB, jogo.resultadoA, jogo.resultadoB, data.pontuacao) : null;
-                          return (
-                            <div key={p.id} style={{
-                              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                              borderRadius: '8px', padding: '0.6rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem'
-                            }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 600, flex: '1 1 100px' }}>{p.nome}</span>
-                              {palpite && palpite.confirmado ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{palpite.golsA} x {palpite.golsB}</span>
-                                  {jogo.status === 'finalizado' && pts !== null && (
-                                    <span style={{
-                                      fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '99px',
-                                      background: pts === data.pontuacao.exato ? 'rgba(34,197,94,0.15)' : pts === data.pontuacao.vencedor ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.05)',
-                                      color: pts === data.pontuacao.exato ? colors.green : pts === data.pontuacao.vencedor ? colors.cyan : colors.textMuted,
-                                      border: `1px solid ${pts === data.pontuacao.exato ? 'rgba(34,197,94,0.3)' : pts === data.pontuacao.vencedor ? 'rgba(6,182,212,0.3)' : 'rgba(255,255,255,0.08)'}`
-                                    }}>
-                                      {pts === data.pontuacao.exato ? '🎯' : pts === data.pontuacao.vencedor ? '✅' : '❌'} +{pts}
-                                    </span>
-                                  )}
-                                </div>
-                              ) : jogo.status === 'finalizado' ? (
-                                <span style={{ fontSize: '0.78rem', color: colors.textMuted, fontStyle: 'italic' }}>Sem palpite</span>
-                              ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                  <input
-                                    type="text" inputMode="numeric" placeholder="0"
-                                    value={(palpiteInputs[key] && palpiteInputs[key].golsA) || ''}
-                                    onChange={e => setPalpiteInput(jogo.id, p.id, 'golsA', e.target.value)}
-                                    style={{ ...inputStyle, width: '42px', textAlign: 'center', padding: '0.3rem' }}
-                                  />
-                                  <span style={{ color: colors.textMuted, fontSize: '0.8rem' }}>x</span>
-                                  <input
-                                    type="text" inputMode="numeric" placeholder="0"
-                                    value={(palpiteInputs[key] && palpiteInputs[key].golsB) || ''}
-                                    onChange={e => setPalpiteInput(jogo.id, p.id, 'golsB', e.target.value)}
-                                    style={{ ...inputStyle, width: '42px', textAlign: 'center', padding: '0.3rem' }}
-                                  />
-                                  <button onClick={() => confirmPalpite(jogo.id, p.id)} style={{ ...btn(true, colors.green), padding: '0.3rem 0.7rem', fontSize: '0.72rem' }}>Confirmar</button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* ============ VIEW ADMIN ============ */}
-        {view === 'admin' && (
-          <>
-            {!adminLoggedIn ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', padding: '4rem 1rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '3rem' }}>🔐</div>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Área Restrita</h2>
-                <p style={{ color: colors.textSecondary, maxWidth: '320px' }}>Digite o PIN de 4 dígitos para acessar o painel de administração.</p>
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                  {[0, 1, 2, 3].map(i => (
-                    <input
-                      key={i} id={`pin-${i}`} type="password" maxLength={1} inputMode="numeric"
-                      value={pinInputs[i]}
-                      onChange={e => handlePinInput(i, e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') checkPin(); }}
-                      style={{
-                        width: '52px', height: '56px', textAlign: 'center', fontSize: '1.4rem', fontWeight: 800,
-                        background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '12px',
-                        color: colors.textPrimary, outline: 'none'
-                      }}
-                    />
-                  ))}
-                </div>
-                {pinError && <div style={{ color: colors.red, fontSize: '0.82rem' }}>PIN incorreto. Tente novamente.</div>}
-                <button onClick={checkPin} style={btn(true, colors.red)}>🔓 Entrar</button>
-                <p style={{ fontSize: '0.82rem', color: colors.textMuted }}>PIN padrão: <strong style={{ color: colors.textSecondary }}>1234</strong></p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', paddingBottom: '3rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setAdminLoggedIn(false)} style={btn(false, colors.red)}>🔒 Sair do Admin</button>
-                </div>
-
-                {/* Participantes */}
-                <div style={cardStyle}>
-                  <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${colors.border}`, background: 'rgba(168,85,247,0.05)' }}>
-                    <h3 style={{ fontSize: '0.85rem', fontWeight: 700 }}>👾 Gerenciar Participantes</h3>
-                  </div>
-                  <div style={{ padding: '1.25rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-                      {data.participantes.map(p => {
-                        const s = getStatsForParticipant(p.id);
-                        return (
-                          <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0.65rem 1rem' }}>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{p.nome}</div>
-                              <div style={{ fontSize: '0.8rem', color: colors.purple }}>{s.total} pts · {s.exatos} exatos · {s.vencedores} venc/emp</div>
-                            </div>
-                            <button onClick={() => removeParticipant(p.id)} style={{ ...btn(false, colors.red), padding: '0.35rem 0.85rem', fontSize: '0.78rem' }}>🗑️ Remover</button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ height: '1px', background: colors.border, margin: '1rem 0' }} />
-                    <p style={{ fontSize: '0.82rem', color: colors.textMuted, marginBottom: '0.6rem' }}>Adicionar novo participante:</p>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input
-                        type="text" value={newParticipant} onChange={e => setNewParticipant(e.target.value)}
-                        placeholder="Ex: 🚀 João" maxLength={40}
-                        style={{ ...inputStyle, flex: 1 }}
-                      />
-                      <button onClick={addParticipant} style={btn(true, colors.green)}>+ Adicionar</button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Jogos */}
-                <div style={cardStyle}>
-                  <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${colors.border}`, background: 'rgba(168,85,247,0.05)' }}>
-                    <h3 style={{ fontSize: '0.85rem', fontWeight: 700 }}>⚽ Adicionar Jogo</h3>
-                  </div>
-                  <div style={{ padding: '1.25rem' }}>
-                    <p style={{ fontSize: '0.82rem', color: colors.textMuted, marginBottom: '0.6rem' }}>
-                      Para gerenciar resultados e palpites confirmados, acesse a aba "⚽ Jogos" (estando logado no admin, os campos de resultado oficial aparecem nos cards).
-                    </p>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <input
-                        type="text" value={newGame.timeA} onChange={e => setNewGame(g => ({ ...g, timeA: e.target.value }))}
-                        placeholder="Time A — ex: 🇧🇷 Brasil"
-                        style={{ ...inputStyle, flex: '1 1 180px' }}
-                      />
-                      <span style={{ alignSelf: 'center', color: colors.textMuted }}>x</span>
-                      <input
-                        type="text" value={newGame.timeB} onChange={e => setNewGame(g => ({ ...g, timeB: e.target.value }))}
-                        placeholder="Time B — ex: 🇦🇷 Argentina"
-                        style={{ ...inputStyle, flex: '1 1 180px' }}
-                      />
-                      <button onClick={addGame} style={btn(true, colors.green)}>+ Adicionar Jogo</button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pontuação */}
-                <div style={cardStyle}>
-                  <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${colors.border}`, background: 'rgba(168,85,247,0.05)' }}>
-                    <h3 style={{ fontSize: '0.85rem', fontWeight: 700 }}>⚡ Regras de Pontuação</h3>
-                  </div>
-                  <div style={{ padding: '1.25rem' }}>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: '120px' }}>
-                        <label style={{ fontSize: '0.82rem', color: colors.textMuted }}>Placar Exato</label>
-                        <input type="number" value={data.pontuacao.exato} min={1} max={99}
-                          onChange={e => saveData({ ...data, pontuacao: { ...data.pontuacao, exato: parseInt(e.target.value) || 2 } })}
-                          style={{ ...inputStyle, width: '100%', marginTop: '4px' }} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: '120px' }}>
-                        <label style={{ fontSize: '0.82rem', color: colors.textMuted }}>Vencedor/Empate</label>
-                        <input type="number" value={data.pontuacao.vencedor} min={1} max={99}
-                          onChange={e => saveData({ ...data, pontuacao: { ...data.pontuacao, vencedor: parseInt(e.target.value) || 1 } })}
-                          style={{ ...inputStyle, width: '100%', marginTop: '4px' }} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: '120px' }}>
-                        <label style={{ fontSize: '0.82rem', color: colors.textMuted }}>Erro</label>
-                        <input type="number" value={data.pontuacao.erro} min={0} max={99}
-                          onChange={e => saveData({ ...data, pontuacao: { ...data.pontuacao, erro: parseInt(e.target.value) || 0 } })}
-                          style={{ ...inputStyle, width: '100%', marginTop: '4px' }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Backup / Migração de Dados */}
-                <div style={cardStyle}>
-                  <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${colors.border}`, background: 'rgba(168,85,247,0.05)' }}>
-                    <h3 style={{ fontSize: '0.85rem', fontWeight: 700 }}>💾 Backup / Migração de Dados</h3>
-                  </div>
-                  <div style={{ padding: '1.25rem' }}>
-                    <p style={{ fontSize: '0.82rem', color: colors.textMuted, marginBottom: '1rem' }}>
-                      Use "Exportar" para salvar uma cópia de todos os dados (participantes, jogos, palpites, resultados e pontuação) em um arquivo. Se o artifact for republicado e gerar um novo link, use "Importar" nesse novo link para restaurar tudo sem perder nada.
-                    </p>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button onClick={exportData} style={btn(true, colors.cyan)}>⬇️ Exportar Dados (.json)</button>
-                      <label style={{ ...btn(true, colors.green), cursor: 'pointer' }}>
-                        ⬆️ Importar Dados (.json)
-                        <input type="file" accept="application/json" onChange={importData} style={{ display: 'none' }} />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Footer */}
-        <footer style={{ textAlign: 'center', padding: '2.5rem 1rem', color: colors.textMuted, fontSize: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: '3rem' }}>
-          <p>👽 <span style={{ color: colors.purple }}>Bolão dos Aliens</span> • Copa do Mundo 2026 • Que vença o melhor palpiteiro da galáxia 🛸</p>
-        </footer>
-      </div>
-
-      {/* Modal Participante */}
-      {modalParticipant !== null && (() => {
-        const p = data.participantes.find(x => x.id === modalParticipant);
-        if (!p) return null;
-        const stats = getStatsForParticipant(p.id);
-        const jogosComPalpite = data.jogos.filter(j => j.palpites[p.id] && j.palpites[p.id].confirmado);
-        return (
-          <div
-            onClick={() => setModalParticipant(null)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-          >
-            <div onClick={e => e.stopPropagation()} style={{ ...cardStyle, border: '1px solid rgba(168,85,247,0.4)', maxWidth: '600px', width: '100%', maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 0 60px rgba(168,85,247,0.25)' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '1.5rem 1.5rem 1rem', borderBottom: `1px solid ${colors.border}` }}>
-                <div>
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{p.nome}</h2>
-                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.5rem 0.85rem', textAlign: 'center' }}>
-                      <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: colors.textMuted, marginBottom: '2px' }}>Total</span>
-                      <span style={{ display: 'block', fontSize: '1.3rem', fontWeight: 900, color: colors.purple }}>{stats.total}</span>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.5rem 0.85rem', textAlign: 'center' }}>
-                      <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: colors.textMuted, marginBottom: '2px' }}>Exatos</span>
-                      <span style={{ display: 'block', fontSize: '1.3rem', fontWeight: 900, color: colors.green }}>{stats.exatos}</span>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.5rem 0.85rem', textAlign: 'center' }}>
-                      <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: colors.textMuted, marginBottom: '2px' }}>Venc/Emp</span>
-                      <span style={{ display: 'block', fontSize: '1.3rem', fontWeight: 900, color: colors.cyan }}>{stats.vencedores}</span>
-                    </div>
-                  </div>
-                </div>
-                <button onClick={() => setModalParticipant(null)} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.1rem', color: colors.textSecondary, flexShrink: 0, marginLeft: '1rem' }}>✕</button>
-              </div>
-              <div style={{ padding: '1.25rem 1.5rem 1.5rem' }}>
-                <h3 style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: colors.textMuted, marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>📋 Histórico de Palpites</h3>
-                {jogosComPalpite.length === 0 ? (
-                  <p style={{ color: colors.textMuted, fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>Nenhum palpite confirmado ainda.</p>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ fontSize: '0.65rem', padding: '0.5rem 0.75rem', textAlign: 'left', color: colors.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Jogo</th>
-                          <th style={{ fontSize: '0.65rem', padding: '0.5rem 0.75rem', textAlign: 'left', color: colors.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Palpite</th>
-                          <th style={{ fontSize: '0.65rem', padding: '0.5rem 0.75rem', textAlign: 'left', color: colors.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Resultado</th>
-                          <th style={{ fontSize: '0.65rem', padding: '0.5rem 0.75rem', textAlign: 'right', color: colors.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Pts</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {jogosComPalpite.map(jogo => {
-                          const g = jogo.palpites[p.id];
-                          const pts = jogo.resultadoA !== null ? calcPoints(g.golsA, g.golsB, jogo.resultadoA, jogo.resultadoB, data.pontuacao) : null;
-                          let ptClass = { bg: 'rgba(168,85,247,0.1)', color: colors.purple, border: 'rgba(168,85,247,0.2)', label: '⏳ —' };
-                          if (pts !== null) {
-                            if (pts === data.pontuacao.exato) ptClass = { bg: 'rgba(34,197,94,0.15)', color: colors.green, border: 'rgba(34,197,94,0.3)', label: `🎯 ${pts}` };
-                            else if (pts === data.pontuacao.vencedor) ptClass = { bg: 'rgba(6,182,212,0.15)', color: colors.cyan, border: 'rgba(6,182,212,0.3)', label: `✅ ${pts}` };
-                            else ptClass = { bg: 'rgba(255,255,255,0.05)', color: colors.textMuted, border: 'rgba(255,255,255,0.08)', label: `❌ ${pts}` };
-                          }
-                          return (
-                            <tr key={jogo.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                              <td style={{ padding: '0.65rem 0.75rem' }}>{jogo.timeA} x {jogo.timeB}</td>
-                              <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700 }}>{g.golsA} x {g.golsB}</td>
-                              <td style={{ padding: '0.65rem 0.75rem' }}>{jogo.resultadoA !== null ? `${jogo.resultadoA} x ${jogo.resultadoB}` : <em style={{ color: colors.textMuted }}>Aguardando</em>}</td>
-                              <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right' }}>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '3px 10px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 800, background: ptClass.bg, color: ptClass.color, border: `1px solid ${ptClass.border}` }}>{ptClass.label}</span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-    </div>
-  );
+  document.getElementById('catDetailBody').innerHTML = html;
+  document.getElementById('catalogDetailOverlay').classList.add('show');
 }
+
+// ═══════════════════════════════════════════════
+// 0x0 PANEL
+// ═══════════════════════════════════════════════
+function openZero(){document.getElementById('zeroPanel').classList.add('show');}
+function closeZero(){document.getElementById('zeroPanel').classList.remove('show');}
+function renderZeroPanel(){
+  const z=DB.zeros();
+  document.getElementById('zeroCnt').textContent=z.length;
+  const el=document.getElementById('zeroList');
+  if(!z.length){el.innerHTML=`<div class="empty"><div class="empty-icon">🎯</div><div class="empty-title">Nenhum jogo em observação</div><div class="empty-desc">Jogos com FT 0×0 aparecem aqui automaticamente.</div></div>`;return;}
+  el.innerHTML=z.map(x=>`<div class="zero-item"><div class="zero-match">${x.match}</div><div class="zero-meta"><span>🏆 ${x.league||'—'}</span><span>📅 ${x.ts}</span><span style="color:${COLORS[x.verdict?.cls||'red']}">${ICONS[x.verdict?.cls||'red']} ${x.total}/${x.maxPts} pts</span></div></div>`).join('');
+}
+
+// ═══════════════════════════════════════════════
+// INFO MODAL
+// ═══════════════════════════════════════════════
+function openInfo(){document.getElementById('infoOverlay').classList.add('show');}
+function closeInfo(){document.getElementById('infoOverlay').classList.remove('show');}
+
+// ═══════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════
+function goPage(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el)el.classList.add('active');
+  if(id==='bilhetes')renderBilhetes();
+  if(id==='catalog')renderCatalog();
+}
+function goPageDirect(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  const map={analyze:0,bilhetes:1,catalog:2};
+  const tabs=document.querySelectorAll('.nav-tab');
+  if(tabs[map[id]])tabs[map[id]].classList.add('active');
+}
+function updateBadges(){
+  document.getElementById('pill-b').textContent=DB.bilhetes().length;
+  document.getElementById('pill-c').textContent=DB.catalog().length;
+  document.getElementById('zeroCnt').textContent=DB.zeros().length;
+}
+
+// ═══════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════
+function showLoading(s){document.getElementById('loadingStep').textContent=s;document.getElementById('loading').classList.add('show');}
+function hideLoading(){document.getElementById('loading').classList.remove('show');}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+// ═══════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
